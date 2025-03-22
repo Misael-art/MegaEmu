@@ -1,0 +1,25 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.h": "c",
+			"*.c": "c"
+		}
+	},
+	"launch": {
+		"configurations": [
+			{
+				"type": "cmake",
+				"request": "launch",
+				"name": "Debug portfile(s)",
+				"cmakeDebugType": "external",
+				"pipeName": "\\\\.\\pipe\\vcpkg_ext_portfile_dbg",
+				"preLaunchTask": "Debug vcpkg commands"
+			}
+		]
+	}
+}

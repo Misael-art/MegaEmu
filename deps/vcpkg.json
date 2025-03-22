@@ -1,0 +1,27 @@
+{
+    "name": "mega-emu",
+    "version": "0.1.0",
+    "description": "Emulador modular e extensível para múltiplas plataformas",
+    "homepage": "https://github.com/SEU_USUARIO/Mega_Emu",
+    "dependencies": [
+        "sdl2",
+        "sdl2-ttf",
+        "zlib",
+        "libpng",
+        "opengl"
+    ],
+    "features": {
+        "test": {
+            "description": "Dependências para testes",
+            "dependencies": [
+                "gtest"
+            ]
+        },
+        "docs": {
+            "description": "Dependências para documentação",
+            "dependencies": [
+                "doxygen"
+            ]
+        }
+    }
+}

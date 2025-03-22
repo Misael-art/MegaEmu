@@ -1,0 +1,1 @@
+/** * @file sound_monitor.c * @brief Implementação do monitor de áudio */#include <stdio.h>#include <stdlib.h>#include <string.h>#include "core/core.h"#include "tools/core/tools_manager.h"// Implementação mínima para permitir a compilação// Será expandida no futuro com a implementação completa 

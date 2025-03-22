@@ -1,0 +1,1 @@
+/** * @file frontend_common.c * @brief Implementação de funções comuns para frontends */#include <stdio.h>#include <stdlib.h>#include <string.h>#include "core/core.h"#include "frontend.h"// Implementação mínima para permitir a compilação// Será expandida no futuro com a implementação completa 

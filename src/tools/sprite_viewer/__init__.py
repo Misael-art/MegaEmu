@@ -1,0 +1,1 @@
+import tkinter as tkfrom .gui import SpriteViewerGUIdef main():    root = tk.Tk()    app = SpriteViewerGUI(root)    root.geometry("800x600")    root.mainloop()if __name__ == "__main__":    main()

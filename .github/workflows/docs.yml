@@ -1,0 +1,36 @@
+name: Documentation CI/CD
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      
+      - name: Install dependencies
+        run: |
+          pip install mkdocs mkdocs-material pymdown-extensions
+          pip install pytest pytest-md
+      
+      - name: Run documentation tests
+        run: |
+          python tools/validate_docs.py
+          python -m pytest tests/docs/
+      
+      - name: Build documentation
+        run: mkdocs build
+      
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site

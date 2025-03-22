@@ -1,0 +1,1 @@
+#include <stdint.h>typedef struct {    bool z80_has_bus;    bool m68k_waiting;    uint16_t shared_ram_access;} emu_bus_state_t;void emu_z80_request_bus(void);void emu_z80_release_bus(void);void emu_handle_bank_switching(void);void emu_sync_audio(void);

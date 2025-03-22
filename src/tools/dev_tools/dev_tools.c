@@ -1,0 +1,1 @@
+/** * @file dev_tools.c * @brief Implementação das ferramentas de desenvolvimento */#include <stdio.h>#include <stdlib.h>#include <string.h>#include "core/core.h"#include "tools/core/tools_manager.h"// Implementação mínima para permitir a compilação// Será expandida no futuro com a implementação completa 

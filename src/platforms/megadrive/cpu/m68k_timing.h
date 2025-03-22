@@ -1,0 +1,1 @@
+#include <stdint.h>#define EMU_MOVE_CYCLES    4#define EMU_ALU_CYCLES     2#define EMU_BRANCH_CYCLES  10typedef struct {    uint32_t current_cycles;    uint8_t wait_states;    bool is_halted;} emu_m68k_timing_t;uint8_t emu_m68k_calculate_memory_timing(uint32_t address);void emu_m68k_sync_with_z80(emu_m68k_timing_t* timing);void emu_m68k_wait_for_vdp(emu_m68k_timing_t* timing);

@@ -1,0 +1,1 @@
+#include <stdint.h>#ifndef EMU_SPRITE_NODE_H#define EMU_SPRITE_NODE_Htypedef struct {    uint16_t x, y;    uint8_t width, height;    uint16_t tile_index;    uint8_t palette_index;} EmuSpriteNodeParams;emu_status_t emu_sprite_node_init(EmuNode* node);void emu_sprite_node_update(EmuNode* node);#endif // EMU_SPRITE_NODE_H

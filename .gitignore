@@ -1,0 +1,113 @@
+# Arquivos compilados
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
+*.exe
+
+# Diretórios de build
+build/
+out/
+bin/
+lib/
+Debug/
+Release/
+x64/
+x86/
+
+# Diretórios e arquivos do CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# Arquivos temporários
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Arquivos de configuração e cache de IDEs
+.vscode/
+.idea/
+.vs/
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.db
+*.opendb
+*.VC.db
+ipch/
+.settings/
+.clangd
+
+# Arquivos de log
+*.log
+
+# Diretórios e arquivos específicos do projeto
+.cursor/cache/
+.model_activity_log.txt
+
+# Arquivos de estado de depuração
+*.dmp
+core
+
+# Arquivos de IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Arquivos de compilação
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Arquivos de dependência
+vcpkg_installed/
+conan.lock
+conanbuildinfo.cmake
+conanbuildinfo.txt
+
+# Arquivos de documentação
+docs/html/
+docs/latex/
+
+# Arquivos de log
+*.log
+logs/
+
+# Arquivos de teste
+test_results/
+coverage/
+*.gcda
+*.gcno
+*.gcov
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos de ROM e save
+*.rom
+*.bin
+*.sav
+*.state
+
+# Arquivos temporários
+*.tmp
+*.temp
+*.bak
+*.backup

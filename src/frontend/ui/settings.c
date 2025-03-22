@@ -1,0 +1,1 @@
+// ✅ CORRIGIDO: Segue padrão de nomenclaturavoid frontend_settings_init(){    // ... código existente ...}

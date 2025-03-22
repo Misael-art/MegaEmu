@@ -1,0 +1,50 @@
+name: Mega_Emu CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Instalar dependências
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libsdl2-dev
+
+    - name: Verificar tipos e consistência
+      run: |
+        chmod +x scripts/verify_types.sh
+        scripts/verify_types.sh
+
+    - name: Verificar estilo de código
+      run: |
+        chmod +x scripts/check_code_style.py
+        python3 scripts/check_code_style.py
+
+    - name: Criar diretório de build
+      run: mkdir -p build
+
+    - name: Configurar CMake
+      working-directory: build
+      run: cmake ..
+
+    - name: Compilar
+      working-directory: build
+      run: cmake --build .
+
+    - name: Executar testes
+      working-directory: build/bin
+      run: |
+        if [ -f unit_tests ]; then
+          ./unit_tests
+        else
+          echo "Unit tests not built"
+          exit 1
+        fi

@@ -1,0 +1,528 @@
+# Diretrizes de Desenvolvimento do Mega_Emu
+
+Este documento estabelece as diretrizes técnicas e padrões para o desenvolvimento do projeto Mega_Emu. Todos os contribuidores devem seguir essas orientações para manter a consistência e qualidade do código.
+
+## Padrões de Codificação
+
+### Estilo e Formatação
+
+1. **Nomenclatura:**
+   - Tipos e Typedefs: `snake_case_t` (ex: `emulator_context_t`)
+   - Estruturas: `CamelCase` (ex: `EmulatorContext`)
+   - Macros e constantes: `UPPER_CASE` (ex: `MAX_ROM_SIZE`)
+   - Funções e variáveis: `snake_case` (ex: `init_emulator`)
+
+2. **Prefixos:**
+   - APIs públicas: `emu_` (ex: `emu_initialize()`)
+   - Funções/variáveis privadas: `_` (ex: `_internal_function()`)
+   - Macros e constantes: `EMU_` (ex: `EMU_MAX_SCANLINES`)
+   - Ferramentas de desenvolvimento: `dev_` (ex: `dev_sprite_viewer_init()`)
+   - Componentes de interface: `ui_` (ex: `ui_button_create()`)
+
+3. **Identação e Formatação:**
+   - Indentação: 4 espaços (não tabs)
+   - Limite de 100 caracteres por linha
+   - Chaves em nova linha para funções, mesma linha para blocos
+   - Espaço após palavras-chave (`if`, `for`, `while`, etc.)
+
+4. **Comentários:**
+   - Utilize Doxygen para documentação de API
+   - Documente todos os parâmetros, retornos e efeitos colaterais
+   - Inclua comentários explicativos para código complexo
+   - Mantenha comentários atualizados ao modificar código
+
+### Tamanho e Complexidade
+
+1. **Funções:**
+   - Limite de 50 linhas por função (ideal)
+   - Máximo de 100 linhas por função (absoluto)
+   - Uma única responsabilidade por função
+   - Máximo de 5 parâmetros por função
+
+2. **Arquivos:**
+   - Limite de 300-400 linhas por arquivo (ideal)
+   - Máximo de 1000 linhas por arquivo (absoluto)
+   - Separar em módulos lógicos quando ultrapassar o limite
+
+3. **Complexidade:**
+   - Evite aninhamento excessivo (máximo 3 níveis)
+   - Prefira early returns para reduzir aninhamento
+   - Limite de 10 para complexidade ciclomática
+
+## Práticas de Programação
+
+### Gerais
+
+1. **Gerenciamento de Memória:**
+   - Sempre libere recursos alocados
+   - Verifique retornos de funções de alocação
+   - Evite vazamentos de memória com valgrind/memcheck
+   - Utilize RAII (C++) quando apropriado
+
+2. **Tratamento de Erros:**
+   - Retorne códigos de erro consistentes (definidos em `error_codes.h`)
+   - Verifique todos os retornos de funções
+   - Documente condições de erro
+   - Implemente logs detalhados para falhas
+
+3. **Concorrência:**
+   - Evite condições de corrida
+   - Proteja recursos compartilhados
+   - Evite bloqueios e deadlocks
+   - Documente premissas sobre threading
+
+4. **Segurança:**
+   - Valide toda entrada do usuário
+   - Evite buffer overflows
+   - Não exponha informações sensíveis em logs
+   - Implemente limites e verificações para recursos
+
+### Específicas para Emulação
+
+1. **Precisão vs. Desempenho:**
+   - Precisão é prioritária em casos de conflito
+   - Otimizações não devem comprometer a precisão
+   - Documente compromissos quando necessário
+   - Inclua opções para usuários priorizarem desempenho
+
+2. **Emulação de CPU:**
+   - Implemente emulação ciclo-a-ciclo precisa
+   - Dê especial atenção ao timing de interrupções
+   - Documente comportamentos não-documentados
+   - Implemente instruções ilegais e casos de borda
+
+3. **Emulação de Vídeo e Áudio:**
+   - Garanta sincronização precisa com CPU
+   - Implemente efeitos especiais e casos de borda
+   - Suporte diferentes modos de vídeo e filtros
+   - Mantenha latência mínima sem comprometer precisão
+
+## Diretrizes para Ferramentas de Desenvolvimento
+
+### Princípios de Design para Ferramentas
+
+1. **Modularidade:**
+   - Cada ferramenta deve ser um módulo separado
+   - Defina interfaces claras entre ferramentas
+   - Permita que ferramentas operem independentemente ou em conjunto
+   - Siga o padrão MVC (Model-View-Controller)
+
+2. **Consistência:**
+   - Mantenha UI/UX consistente entre ferramentas
+   - Use terminologia consistente em toda a interface
+   - Reutilize componentes de UI quando possível
+   - Implemente comportamentos padronizados (atalhos, menus, etc.)
+
+3. **Extensibilidade:**
+   - Projete para permitir extensões futuras
+   - Implemente sistema de plugins
+   - Separe interface de implementação
+   - Forneça hooks para personalização
+
+4. **Performance:**
+   - Garanta que ferramentas não impactem significativamente a emulação
+   - Implemente renderização e processamento eficientes
+   - Use threading para operações pesadas
+   - Implemente lazy loading e virtualização para grandes conjuntos de dados
+
+### Implementação de Ferramentas Visuais
+
+1. **Sprite Viewer:**
+   - Utilize extração direta da VRAM em tempo real
+   - Implemente visualização baseada em OpenGL para performance
+   - Organize sprites por camadas e prioridade
+   - Implemente sistema de cache para melhorar performance
+   - Garanta que a extração de paletas seja específica por plataforma
+   - Use uma estrutura de dados unificada para representação de sprites:
+     ```c
+     typedef struct {
+         uint32_t id;              // ID único do sprite
+         uint8_t* data;            // Dados brutos
+         uint32_t width;           // Largura em pixels
+         uint32_t height;          // Altura em pixels
+         uint8_t bpp;              // Bits por pixel
+         palette_t* palette;       // Paleta associada
+         sprite_attributes_t attr; // Atributos específicos da plataforma
+     } sprite_t;
+     ```
+
+2. **Dev Art Tools:**
+   - Implemente ferramentas específicas para cada formato gráfico
+   - Suporte importação/exportação em formatos modernos
+   - Forneça previsualização em tempo real no hardware emulado
+   - Siga as restrições de cada plataforma (paletas, tamanhos, etc.)
+   - Implemente histórico de ações (undo/redo)
+   - Use representação intermediária para conversão entre formatos:
+     ```c
+     typedef struct {
+         graphics_format_t format;   // Formato dos dados
+         conversion_rules_t rules;   // Regras de conversão
+         platform_limits_t limits;   // Limitações da plataforma
+     } graphics_converter_t;
+     ```
+
+3. **Memory Viewer:**
+   - Implemente acesso direto à memória emulada
+   - Forneça múltiplas visualizações (hex, decimal, ASCII, etc.)
+   - Suporte bookmarks e regiões nomeadas
+   - Implemente watches e breakpoints na memória
+   - Otimize para grandes volumes de memória
+   - Use acesso indireto via callbacks:
+     ```c
+     typedef struct {
+         void* context;             // Contexto do emulador
+         uint8_t (*read_byte)(void* context, uint32_t address);
+         void (*write_byte)(void* context, uint32_t address, uint8_t value);
+         memory_map_t* memory_map;  // Mapa de regiões de memória
+     } memory_access_t;
+     ```
+
+4. **Event Viewer:**
+   - Implemente sistema de captura de eventos em pontos-chave da emulação
+   - Use estrutura de timeline para visualização
+   - Suporte filtragem e busca de eventos
+   - Garanta baixo overhead para não afetar a emulação
+   - Implemente buffer circular para histórico de eventos
+   - Use estrutura unificada para eventos:
+     ```c
+     typedef struct {
+         uint64_t timestamp;        // Timestamp do evento
+         event_type_t type;         // Tipo do evento
+         uint32_t source;           // Fonte do evento
+         uint32_t target;           // Alvo do evento
+         uint32_t data[4];          // Dados específicos
+         char description[64];      // Descrição legível
+     } system_event_t;
+     ```
+
+5. **Sound Monitor:**
+   - Implemente visualização em tempo real dos canais de áudio
+   - Forneça análise de espectro e forma de onda
+   - Permita controle individual de canais (mute, solo)
+   - Suporte exportação de áudio em formatos modernos
+   - Garanta sincronização precisa com a emulação
+   - Use interfaces padronizadas:
+     ```c
+     typedef struct {
+         uint32_t num_channels;           // Número de canais
+         audio_channel_t* channels;       // Array de canais
+         audio_format_t format;           // Formato de áudio
+         void (*get_samples)(void* ctx, float** buffers, uint32_t num_samples);
+         void* context;                   // Contexto do emulador
+     } sound_monitor_t;
+     ```
+
+6. **Dev Editor:**
+   - Implemente destaque de sintaxe para assembly de cada CPU
+   - Suporte montagem em tempo real e injeção de código
+   - Integre-se com o debugger para breakpoints e stepping
+   - Forneça sugestões e autocompletar para instruções
+   - Implemente gerenciamento de projetos
+   - Use estrutura modular:
+     ```c
+     typedef struct {
+         editor_buffer_t* buffer;         // Buffer de texto
+         syntax_highlighter_t* highlighter; // Destacador de sintaxe
+         assembler_t* assembler;          // Montador específico da CPU
+         project_t* project;              // Projeto atual
+         ui_component_t* ui;              // Componente de UI
+     } dev_editor_t;
+     ```
+
+7. **Node IDE:**
+   - Implemente sistema visual baseado em nodos e conexões
+   - Forneça nodos para acesso a componentes do emulador
+   - Suporte para scripting avançado via linguagem de alto nível
+   - Sistema de execução em tempo real ou diferido
+   - Integração com outras ferramentas
+   - Estrutura básica:
+     ```c
+     typedef struct {
+         node_graph_t* graph;             // Grafo de nodos
+         node_library_t* library;         // Biblioteca de nodos disponíveis
+         execution_context_t* exec_ctx;   // Contexto de execução
+         ui_canvas_t* canvas;             // Canvas para renderização
+     } node_ide_t;
+     ```
+
+### Implementação de Ferramentas Integradas
+
+1. **Dev Tools Suite:**
+   - Implemente sistema de janelas ancoráveis (docking)
+   - Forneça gerenciamento de workspace e layouts
+   - Implemente sistema de comunicação entre ferramentas
+   - Suporte temas e personalização de UI
+   - Sistema de extensões e plugins
+   - Estrutura recomendada:
+     ```c
+     typedef struct {
+         tool_registry_t* tools;          // Registro de ferramentas
+         window_manager_t* window_mgr;    // Gerenciador de janelas
+         plugin_manager_t* plugin_mgr;    // Gerenciador de plugins
+         ui_theme_t* theme;               // Tema atual
+         ui_workspace_t* workspace;       // Workspace atual
+     } dev_tools_suite_t;
+     ```
+
+2. **ROM Analyzer:**
+   - Implemente disassembly estático e análise de código
+   - Forneça detecção de padrões (loops, tabelas, etc.)
+   - Suporte anotações e comentários
+   - Implemente análise de uso de recursos da plataforma
+   - Gere relatórios detalhados
+   - Estrutura básica:
+     ```c
+     typedef struct {
+         rom_data_t* rom;                 // Dados da ROM
+         disassembler_t* disasm;          // Disassembler
+         pattern_detector_t* detector;    // Detector de padrões
+         annotation_db_t* annotations;    // Banco de anotações
+         resource_analyzer_t* res_analyzer; // Analisador de recursos
+     } rom_analyzer_t;
+     ```
+
+3. **Patch Creator:**
+   - Implemente suporte para formatos de patch (IPS, BPS, UPS)
+   - Forneça interface visual para comparação de ROMs
+   - Suporte criação de patches condicionais
+   - Implemente sistema de versionamento
+   - Integre com controle de versão
+   - Estrutura recomendada:
+     ```c
+     typedef struct {
+         rom_data_t* original_rom;        // ROM original
+         rom_data_t* modified_rom;        // ROM modificada
+         patch_format_t format;           // Formato do patch
+         diff_engine_t* diff_engine;      // Motor de diferenciação
+         patch_builder_t* builder;        // Construtor de patches
+     } patch_creator_t;
+     ```
+
+4. **ROM Builder:**
+   - Implemente sistema de build para ROMs
+   - Suporte templates para diferentes plataformas
+   - Forneça gerenciamento de assets
+   - Integre com outras ferramentas de desenvolvimento
+   - Suporte automação via scripts
+   - Estrutura sugerida:
+     ```c
+     typedef struct {
+         project_t* project;              // Projeto atual
+         build_config_t* config;          // Configuração de build
+         asset_manager_t* assets;         // Gerenciador de assets
+         build_pipeline_t* pipeline;      // Pipeline de build
+         platform_template_t* template;   // Template da plataforma
+     } rom_builder_t;
+     ```
+
+### API para Ferramentas de Desenvolvimento
+
+A integração das ferramentas com o emulador deve seguir uma API consistente:
+
+```c
+// Inicialização e finalização
+int dev_tool_init(dev_tool_t* tool, emu_context_t* context);
+int dev_tool_shutdown(dev_tool_t* tool);
+
+// Ciclo de vida
+int dev_tool_update(dev_tool_t* tool);
+int dev_tool_render(dev_tool_t* tool);
+int dev_tool_process_event(dev_tool_t* tool, const event_t* event);
+
+// Comunicação com o emulador
+int dev_tool_register_hooks(dev_tool_t* tool, hook_manager_t* hooks);
+int dev_tool_notify(dev_tool_t* tool, notification_type_t type, const void* data);
+
+// Serialização de estado
+int dev_tool_save_state(dev_tool_t* tool, state_writer_t* writer);
+int dev_tool_load_state(dev_tool_t* tool, state_reader_t* reader);
+```
+
+Cada ferramenta deve implementar essa interface, garantindo interoperabilidade e consistência.
+
+## Arquitetura do Frontend
+
+### Sistema de GUI
+
+1. **Arquitetura em Camadas:**
+   - **Core:** Componentes fundamentais do sistema de GUI
+     - `gui_types.h`: Definição de tipos básicos (retângulos, cores, IDs)
+     - `gui_manager.c/h`: Gerenciamento centralizado de elementos
+     - `gui_element.c/h`: Base para todos os elementos de interface
+   - **Widgets:** Componentes de interface reutilizáveis
+     - Implementados como extensões do elemento base
+     - Cada widget em arquivos separados (gui_[widget].c/h)
+     - Interfaces públicas bem definidas para cada widget
+   - **Adaptador de Plataforma:** Camada de abstração para SDL2
+     - Encapsula chamadas específicas da plataforma
+     - Facilita portabilidade para outras bibliotecas gráficas
+
+2. **Widgets Implementados:**
+   - **Button (Botão):**
+     - Suporte a cliques e hover
+     - Callbacks para eventos de clique
+     - Personalização de cores e aparência
+   - **Label (Rótulo):**
+     - Exibição de texto com diferentes alinhamentos
+     - Opções de transparência e cores
+     - Alinhamento horizontal e vertical configurável
+   - **Text Box (Caixa de Texto):**
+     - Entrada e edição de texto pelo usuário
+     - Sistema de foco e cursor de texto
+     - Callbacks para mudanças de texto
+     - Opções de somente leitura e tamanho máximo
+     - Personalização de cores e bordas
+
+3. **Widgets Planejados:**
+   - List (Lista)
+   - Progress Bar (Barra de Progresso)
+   - Checkbox (Caixa de Seleção)
+   - Radio Button (Botão de Opção)
+   - Dropdown (Menu Suspenso)
+   - Canvas (Área de Desenho)
+   - Table (Tabela)
+   - Tree View (Visualização em Árvore)
+   - Splitter (Divisor de Painéis)
+   - Tab View (Visualização em Abas)
+   - Dockable Panels (Painéis Ancoráveis)
+
+4. **Padrões de Implementação:**
+   - Cada widget deve implementar funções para:
+     - Criação e inicialização
+     - Renderização
+     - Processamento de eventos
+     - Configuração de propriedades
+     - Callbacks para interatividade
+   - Prefixos de função consistentes: `gui_[widget]_[ação]`
+   - Documentação completa em estilo Doxygen
+   - Testes unitários para cada widget
+
+5. **Integração com o Emulador:**
+   - Interface unificada via frontend.c/h
+   - Inicialização automática do sistema de GUI
+   - Processamento de eventos integrado ao loop principal
+   - Renderização sincronizada com o ciclo de atualização
+
+6. **Exemplo de Demonstração:**
+   - Disponível em `examples/gui_demo/`
+   - Demonstra a criação e uso de todos os widgets
+   - Serve como referência para implementações futuras
+   - Atualizado com cada novo widget implementado
+
+## Compatibilidade
+
+### Multiplataforma
+
+1. **Sistemas Operacionais:**
+   - Windows 10+ (Visual Studio 2019+, MinGW)
+   - Linux (GCC 9+, Clang 10+)
+   - macOS 10.14+ (AppleClang)
+
+2. **Práticas de Compatibilidade:**
+   - Use abstrações para código específico de plataforma
+   - Evite dependências exclusivas de uma plataforma
+   - Teste em todas as plataformas suportadas
+   - Prefira bibliotecas cross-platform
+
+3. **Requisitos de Hardware:**
+   - Mínimo: CPU dual-core, 2 GB RAM, GPU com OpenGL 3.3+
+   - Recomendado: CPU quad-core, 4 GB RAM, GPU dedicada
+
+### Dependências
+
+1. **Bibliotecas e Ferramentas:**
+   - SDL2 para gráficos, áudio e entrada
+   - CMake 3.15+ para build system
+   - C++17 ou superior para código moderno
+   - Dear ImGui para interfaces gráficas avançadas
+   - OpenGL para renderização acelerada
+   - PortAudio para processamento de áudio avançado
+   - Lua para scripting e extensibilidade
+   - Manter lista atualizada em `docs/THIRD_PARTY.md`
+
+2. **Gestão de Dependências:**
+   - Preferir dependências disponíveis via package managers
+   - Documentar versões específicas necessárias
+   - Incluir scripts de configuração para facilitar setup
+   - Manter dependências externas no diretório `deps/`
+
+## Testes e Qualidade
+
+### Testes
+
+1. **Testes Unitários:**
+   - Cobertura mínima de 70% para core e platforms
+   - Usar framework consistente (GoogleTest, Catch2)
+   - Teste cada componente isoladamente
+   - Inclua casos de borda e caminhos de erro
+
+2. **Testes de Integração:**
+   - Teste interações entre componentes
+   - Use ROMs de teste conhecidas (test_roms/)
+   - Valide comportamento entre diferentes sistemas
+   - Automatize verificação de resultados (scripts de teste : Teste Integração.bat e Teste Unitário.bat)
+   - Documentar resultados em relatório de validação
+
+3. **Testes de Regressão:**
+   - Execute testes em cada PR e commit
+   - Compare resultados com baselines conhecidos
+   - Mantenha suite de testes para bugs corrigidos
+   - Automatize via CI/CD
+
+4. **Testes de UI:**
+   - Teste funcionalidades da interface do usuário
+   - Valide fluxos de usuário comuns
+   - Teste responsividade e acessibilidade
+   - Automatize testes de UI quando possível
+
+### Qualidade de Código
+
+1. **Análise Estática:**
+   - Execute ferramentas como clang-tidy, cppcheck
+   - Zero warnings em build de produção
+   - Configure CI para verificar conformidade
+   - Inclua regras de linting em .clang-format
+
+2. **Profiling e Otimização:**
+   - Identifique gargalos com ferramentas de profiling
+   - Documente decisões de otimização
+   - Benchmark antes e depois de otimizações
+   - Mantenha testes de performance
+
+## Processo de Desenvolvimento
+
+### Fluxo de Trabalho
+
+1. **Branches:**
+   - `main` para código estável
+   - `develop` para desenvolvimento ativo
+   - `feature/*` para novas funcionalidades
+   - `bugfix/*` para correções
+   - `release/*` para preparação de releases
+
+2. **Commits:**
+   - Mensagens claras e descritivas
+   - Formato: `tipo: descrição curta`
+   - Tipos: feat, fix, docs, style, refactor, test, chore
+   - Referência a issues quando aplicável
+
+3. **Pull Requests:**
+   - Descrição completa das mudanças
+   - Testes para novas funcionalidades
+   - Documentação atualizada
+   - Conformidade com padrões de código
+
+4. **Code Reviews:**
+   - Pelo menos uma aprovação necessária
+   - Verificação de qualidade e conformidade
+   - Foco em correção, performance e segurança
+   - Considerar impacto nas plataformas suportadas
+
+## Referências
+
+- @[ESCOPO.md] para entendimento do projeto
+- @[CODING_STANDARDS.md] para detalhes específicos de codificação
+- @[MEMORIA.md] para histórico de decisões técnicas
+- @[ROADMAP.md] para planejamento futuro
+- @[ARCHITECTURE.md] para detalhes da arquitetura do sistema
+- @[TOOLS_ARCHITECTURE.md] para detalhes específicos da arquitetura de ferramentas
