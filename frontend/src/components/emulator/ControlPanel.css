@@ -1,0 +1,32 @@
+.control-panel {
+    padding: 16px;
+    margin: 16px;
+    background-color: #1e1e1e !important;
+    color: white !important;
+}
+
+.panel-title {
+    margin-bottom: 12px !important;
+    font-weight: 500 !important;
+    color: #90caf9 !important;
+    border-bottom: 1px solid #333;
+    padding-bottom: 8px;
+}
+
+.button-container {
+    margin-bottom: 16px !important;
+}
+
+.status-bar {
+    margin-top: 16px;
+    padding: 8px 12px;
+    background-color: #333;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.status-text {
+    color: #aaa !important;
+    font-size: 0.85rem !important;
+}

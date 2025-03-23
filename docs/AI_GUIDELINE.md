@@ -134,6 +134,7 @@ Este documento estabelece as diretrizes técnicas e padrões para o desenvolvime
    - Implemente sistema de cache para melhorar performance
    - Garanta que a extração de paletas seja específica por plataforma
    - Use uma estrutura de dados unificada para representação de sprites:
+
      ```c
      typedef struct {
          uint32_t id;              // ID único do sprite
@@ -153,6 +154,7 @@ Este documento estabelece as diretrizes técnicas e padrões para o desenvolvime
    - Siga as restrições de cada plataforma (paletas, tamanhos, etc.)
    - Implemente histórico de ações (undo/redo)
    - Use representação intermediária para conversão entre formatos:
+
      ```c
      typedef struct {
          graphics_format_t format;   // Formato dos dados
@@ -168,6 +170,7 @@ Este documento estabelece as diretrizes técnicas e padrões para o desenvolvime
    - Implemente watches e breakpoints na memória
    - Otimize para grandes volumes de memória
    - Use acesso indireto via callbacks:
+
      ```c
      typedef struct {
          void* context;             // Contexto do emulador
@@ -184,6 +187,7 @@ Este documento estabelece as diretrizes técnicas e padrões para o desenvolvime
    - Garanta baixo overhead para não afetar a emulação
    - Implemente buffer circular para histórico de eventos
    - Use estrutura unificada para eventos:
+
      ```c
      typedef struct {
          uint64_t timestamp;        // Timestamp do evento
@@ -202,6 +206,7 @@ Este documento estabelece as diretrizes técnicas e padrões para o desenvolvime
    - Suporte exportação de áudio em formatos modernos
    - Garanta sincronização precisa com a emulação
    - Use interfaces padronizadas:
+
      ```c
      typedef struct {
          uint32_t num_channels;           // Número de canais
@@ -219,6 +224,7 @@ Este documento estabelece as diretrizes técnicas e padrões para o desenvolvime
    - Forneça sugestões e autocompletar para instruções
    - Implemente gerenciamento de projetos
    - Use estrutura modular:
+
      ```c
      typedef struct {
          editor_buffer_t* buffer;         // Buffer de texto
@@ -236,6 +242,7 @@ Este documento estabelece as diretrizes técnicas e padrões para o desenvolvime
    - Sistema de execução em tempo real ou diferido
    - Integração com outras ferramentas
    - Estrutura básica:
+
      ```c
      typedef struct {
          node_graph_t* graph;             // Grafo de nodos
@@ -254,6 +261,7 @@ Este documento estabelece as diretrizes técnicas e padrões para o desenvolvime
    - Suporte temas e personalização de UI
    - Sistema de extensões e plugins
    - Estrutura recomendada:
+
      ```c
      typedef struct {
          tool_registry_t* tools;          // Registro de ferramentas
@@ -271,6 +279,7 @@ Este documento estabelece as diretrizes técnicas e padrões para o desenvolvime
    - Implemente análise de uso de recursos da plataforma
    - Gere relatórios detalhados
    - Estrutura básica:
+
      ```c
      typedef struct {
          rom_data_t* rom;                 // Dados da ROM
@@ -288,6 +297,7 @@ Este documento estabelece as diretrizes técnicas e padrões para o desenvolvime
    - Implemente sistema de versionamento
    - Integre com controle de versão
    - Estrutura recomendada:
+
      ```c
      typedef struct {
          rom_data_t* original_rom;        // ROM original
@@ -305,6 +315,7 @@ Este documento estabelece as diretrizes técnicas e padrões para o desenvolvime
    - Integre com outras ferramentas de desenvolvimento
    - Suporte automação via scripts
    - Estrutura sugerida:
+
      ```c
      typedef struct {
          project_t* project;              // Projeto atual
@@ -526,3 +537,218 @@ Cada ferramenta deve implementar essa interface, garantindo interoperabilidade e
 - @[ROADMAP.md] para planejamento futuro
 - @[ARCHITECTURE.md] para detalhes da arquitetura do sistema
 - @[TOOLS_ARCHITECTURE.md] para detalhes específicos da arquitetura de ferramentas
+
+## Diretrizes para Migração de Frontend
+
+A migração do frontend tradicional baseado em SDL2 para uma arquitetura moderna React/TypeScript é um objetivo estratégico do projeto. Estas diretrizes estabelecem como implementar esta transição de forma eficiente e eficaz.
+
+### Princípios da Migração
+
+1. **Separação de Responsabilidades:**
+   - Separar claramente o frontend (interface de usuário) do backend (emulador)
+   - Implementar uma camada de comunicação robusta entre eles
+   - Garantir que cada componente possa evoluir independentemente
+
+2. **Arquitetura de Comunicação:**
+   - Utilizar WebSockets para comunicação em tempo real (frames, inputs, estados)
+   - Implementar API REST para operações não-tempo-real (configurações, gerenciamento de ROMs)
+   - Desenvolver um protocolo de mensagens bem definido
+
+3. **Modernização Incremental:**
+   - Migrar o frontend em fases, mantendo a compatibilidade
+   - Implementar novas funcionalidades já no novo frontend
+   - Permitir coexistência das interfaces durante a transição
+
+### Padrões de Implementação
+
+1. **Servidor WebSocket:**
+   - Implementar em C++ usando uma biblioteca moderna (libwebsockets, Beast)
+   - Otimizar para baixa latência e alta performance
+   - Implementar protocolos de compressão para transmissão de frames
+   - Código exemplo:
+
+     ```cpp
+     /**
+      * @brief Inicializa o servidor WebSocket
+      * @param port Porta para escuta
+      * @return Status da inicialização
+      */
+     int websocket_server_init(uint16_t port) {
+         // Inicialização básica do servidor
+         server_context = ws_create_context();
+
+         // Configuração de handlers
+         ws_set_frame_handler(server_context, handle_frame_request);
+         ws_set_input_handler(server_context, handle_input_event);
+
+         // Iniciar servidor na porta especificada
+         return ws_server_start(server_context, port);
+     }
+     ```
+
+2. **API REST:**
+   - Implementar endpoints RESTful para operações administrativas
+   - Documentar completamente usando Swagger/OpenAPI
+   - Implementar autenticação quando necessário
+   - Seguir práticas modernas de design de API
+
+3. **Frontend React:**
+   - Utilizar React com TypeScript para tipagem estática
+   - Implementar arquitetura baseada em componentes
+   - Seguir padrões modernos de gerenciamento de estado
+   - Otimizar a renderização para jogabilidade fluida
+
+### Ferramentas de Desenvolvimento na Nova Arquitetura
+
+1. **Implementação como Componentes React:**
+   - Converter cada ferramenta existente para componentes React
+   - Utilizar abordagem modular para facilitar manutenção
+   - Aproveitar bibliotecas React especializadas quando apropriado
+   - Exemplo de estrutura para uma ferramenta:
+
+     ```typescript
+     // SpriteViewer.tsx
+     import React, { useEffect, useRef } from 'react';
+     import { useWebSocket } from '@/hooks/useWebSocket';
+     import { useEmulatorState } from '@/hooks/useEmulatorState';
+
+     interface SpriteViewerProps {
+       platform: EmulatorPlatform;
+     }
+
+     export const SpriteViewer: React.FC<SpriteViewerProps> = ({ platform }) => {
+       const canvasRef = useRef<HTMLCanvasElement>(null);
+       const { send, lastMessage } = useWebSocket();
+       const { emulatorState } = useEmulatorState();
+
+       useEffect(() => {
+         // Solicitar sprites quando componente montar
+         send({ type: 'GET_SPRITES', payload: { platform } });
+       }, []);
+
+       useEffect(() => {
+         if (lastMessage?.type === 'SPRITES_DATA') {
+           renderSprites(canvasRef.current, lastMessage.payload);
+         }
+       }, [lastMessage]);
+
+       return (
+         <div className="sprite-viewer">
+           <div className="sprite-viewer-controls">
+             {/* Controles da ferramenta */}
+           </div>
+           <canvas ref={canvasRef} width={800} height={600} />
+         </div>
+       );
+     };
+     ```
+
+2. **Integração com Websocket:**
+   - Implementar hooks React para conexão WebSocket
+   - Desenvolver sistema de mensagens tipadas
+   - Garantir reconexão automática e resiliência
+   - Exemplo de hook WebSocket:
+
+     ```typescript
+     // useWebSocket.ts
+     import { useState, useEffect, useCallback } from 'react';
+
+     export function useWebSocket(url: string) {
+       const [socket, setSocket] = useState<WebSocket | null>(null);
+       const [lastMessage, setLastMessage] = useState<any>(null);
+       const [isConnected, setIsConnected] = useState(false);
+
+       // Função para enviar mensagens
+       const send = useCallback((message: any) => {
+         if (socket?.readyState === WebSocket.OPEN) {
+           socket.send(JSON.stringify(message));
+         }
+       }, [socket]);
+
+       // Inicializar socket
+       useEffect(() => {
+         const ws = new WebSocket(url);
+
+         ws.onopen = () => setIsConnected(true);
+         ws.onclose = () => setIsConnected(false);
+         ws.onmessage = (event) => setLastMessage(JSON.parse(event.data));
+
+         setSocket(ws);
+
+         return () => ws.close();
+       }, [url]);
+
+       return { isConnected, lastMessage, send };
+     }
+     ```
+
+### Diretrizes para IA no Desenvolvimento
+
+A inteligência artificial pode auxiliar significativamente no processo de migração:
+
+1. **Geração de Código:**
+   - A IA pode gerar esqueletos de componentes React
+   - Ajudar na conversão de código C/SDL para TypeScript/React
+   - Gerar tipos TypeScript baseados nas estruturas C existentes
+   - Propor implementações de hooks personalizados
+
+2. **Verificação de Consistência:**
+   - Verificar conformidade com padrões de codificação
+   - Garantir que todos os componentes sigam a mesma arquitetura
+   - Alertar sobre potenciais problemas de performance
+
+3. **Documentação e Comentários:**
+   - Gerar documentação JSDoc/TSDoc para APIs
+   - Explicar padrões de design e decisões arquiteturais
+   - Criar tutoriais e exemplos de uso
+
+4. **Testes:**
+   - Propor casos de teste para componentes e hooks
+   - Gerar testes unitários e de integração
+   - Identificar edge cases importantes para testar
+
+### Abordagem Faseada
+
+1. **Fase 1: Infraestrutura (Q1-Q2 2024)**
+   - Implementação da camada de comunicação
+   - Criação de protótipos de componentes React básicos
+   - Definição de arquitetura e padrões
+
+2. **Fase 2: Implementação Paralela (Q3-Q4 2024)**
+   - Desenvolvimento da interface principal
+   - Implementação de componentes específicos
+   - Início da migração de ferramentas
+
+3. **Fase 3: Transição Completa (Q1 2025)**
+   - Finalização de todas as ferramentas de desenvolvimento
+   - Testes completos e otimização
+   - Descontinuação gradual da interface SDL2
+   - Lançamento da versão 2.0
+
+### Avaliação e Métricas
+
+Para garantir que a migração seja bem-sucedida, as seguintes métricas serão monitoradas:
+
+1. **Performance:**
+   - Latência de input-to-display
+   - FPS e estabilidade
+   - Uso de memória e CPU
+
+2. **Usabilidade:**
+   - Feedback de usuários
+   - Tempo para completar tarefas comuns
+   - Taxa de adoção da nova interface
+
+3. **Desenvolvimento:**
+   - Velocidade de implementação de novas features
+   - Número de bugs reportados
+   - Qualidade e cobertura de testes
+
+### Recursos e Referências para React/TypeScript
+
+- Documentação oficial do React: <https://reactjs.org/docs>
+- Documentação do TypeScript: <https://www.typescriptlang.org/docs>
+- Material UI para componentes: <https://mui.com>
+- Redux Toolkit para estado global: <https://redux-toolkit.js.org>
+- Storybook para documentação de componentes: <https://storybook.js.org>
+- React Testing Library: <https://testing-library.com/docs/react-testing-library/intro>

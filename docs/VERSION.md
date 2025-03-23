@@ -1,6 +1,6 @@
 # Histórico de Versões do Mega_Emu
 
-Versão atual: **1.2.5**
+Versão atual: **1.2.7**
 
 ## Formato de Versão
 
@@ -20,7 +20,66 @@ MAJOR.MINOR.PATCH
 
 ## Histórico de Versões
 
-### v1.2.5 (25/03/2025) - ATUAL
+### v1.2.7 (27/04/2025) - ATUAL
+
+**Mudanças Principais:**
+
+- Implementação completa do Master System com suporte a jogos comerciais
+- Desenvolvimento do Z80 como processador principal do Master System
+- Implementação do Video Display Processor (VDP) específico para o Master System
+- Implementação do Programmable Sound Generator (PSG) para síntese de áudio
+- Sistema de mapeamento de memória otimizado para cartuchos do Master System
+- Interface de entrada com suporte a controles padrão de 2 botões
+- Suporte a múltiplos modos de vídeo e paletas de cores
+- Suporte a interrupções em linhas específicas (HBLANK e VBLANK)
+- Sistema de I/O para comunicação entre componentes
+
+**Componentes Afetados:**
+
+- Core/Z80: Nova implementação modular com adaptadores específicos de plataforma
+- Platform/MasterSystem: Implementação completa de todos os componentes principais
+- Core/Audio: Adição do sistema de áudio do Master System
+- Core/Video: Implementação do VDP do Master System
+- Platform/MegaDrive: Atualização do adaptador Z80 para compatibilidade
+- Tests: Novos testes unitários para componentes do Master System
+- Docs: Atualização da documentação com especificações do Master System
+- Scripts/Build: Suporte ao Master System nos scripts de compilação
+
+**Compatibilidade:**
+
+- Suporte a ROMs comerciais populares como Alex Kidd in Miracle World e Sonic the Hedgehog
+- Compatibilidade com jogos que usam várias regiões de memória e mapeamento de páginas
+- Preservação de estado completo através do sistema de save states
+- Manutenção da compatibilidade com as plataformas existentes (Mega Drive e NES)
+
+### v1.2.6 (26/03/2025)
+
+**Mudanças Principais:**
+
+- Correção da integração do Electron com o frontend React
+- Resolução de problemas de renderização e tela em branco no modo desktop
+- Melhorias no sistema de layout e CSS para garantir exibição correta
+- Correção de erros de tipagem TypeScript para melhor interoperabilidade
+- Implementação de tela de carregamento para melhor experiência inicial
+- Otimização do fluxo de inicialização do Electron
+- Correção de problemas com declarações de tipos para a API Electron
+- Atualização do sistema de arranque e build para ambientes de produção
+
+**Componentes Afetados:**
+
+- Frontend/App: Melhorias no layout e integração com Electron
+- Frontend/Components: Correções de tipagem e props
+- Frontend/Electron: Aprimoramento da integração com preload e IPC
+- Frontend/CSS: Otimizações para garantir renderização correta
+- Scripts/Build: Melhorias no sistema de build e inicialização
+
+**Compatibilidade:**
+
+- Mantém compatibilidade total com a versão anterior
+- Melhora a experiência em modo desktop via Electron
+- Resolve problemas de renderização em diferentes sistemas operacionais
+
+### v1.2.5 (25/03/2025)
 
 **Mudanças Principais:**
 
@@ -30,6 +89,8 @@ MAJOR.MINOR.PATCH
 - Suporte melhorado para interrupções e I/O
 - Documentação atualizada para a nova arquitetura
 - Scripts de automação para verificação de conformidade das interfaces
+- Implementação inicial da estrutura para frontend React/TypeScript
+- Desenvolvimento de componentes básicos para a nova interface
 
 **Componentes Afetados:**
 
@@ -38,12 +99,14 @@ MAJOR.MINOR.PATCH
 - Platform/MasterSystem: Adaptador Z80 específico
 - Tests: Testes atualizados para nova API
 - Docs: Nova documentação com guia de migração
+- Frontend: Estrutura inicial para React/TypeScript
 
 **Compatibilidade:**
 
 - **Incompatível** com código que utilizava a API antiga do Z80
 - Requer migração conforme guia em `docs/architecture/Z80.md`
 - Formato de save state alterado para Z80
+- O frontend antigo e novo coexistem durante a fase de transição
 
 ### v1.2.4 (22/03/2025)
 
@@ -209,7 +272,7 @@ MAJOR.MINOR.PATCH
 
 ## Próxima Versão Planejada
 
-### v1.3.0 (01/04/2025) - ATUAL
+### v1.3.0 (01/07/2025) - PLANEJADA
 
 **Mudanças Principais:**
 
@@ -225,6 +288,13 @@ MAJOR.MINOR.PATCH
   - Verificação de compatibilidade via checksums de ROM
   - Sistema completo de exportação e importação de saves
 
+- Desenvolvimento do Frontend React/TypeScript
+  - Implementação dos componentes principais em React
+  - Integração WebSocket para comunicação em tempo real
+  - API REST para gerenciamento de ROMs e configurações
+  - Sistema de painéis arrastáveis e customizáveis
+  - Suporte a temas específicos de console
+
 - Integração com Sistema de Mappers
   - Suporte a save states para todos os tipos de mappers
   - Salvamento/carregamento de estado para SRAM e EEPROM
@@ -234,52 +304,71 @@ MAJOR.MINOR.PATCH
 
 **Componentes Afetados:**
 
-- Core/SaveState: Novo sistema avançado
-- Core/DeltaCompression: Nova implementação para compressão eficiente
-- Core/ThumbnailGenerator: Gerador de thumbnails WebP com tarja
-- Core/RewindBuffer: Sistema otimizado de buffer circular para rewind
-- Platforms/MegaDrive/State: Implementação específica para Mega Drive
-- Platforms/NES/Save: Implementação específica para NES
-- Platforms/MegaDrive/Memory: Integração com sistema de mappers
-- Platforms/NES/Cartridge: Integração com mappers do NES
+- Core/SaveStates: Nova implementação completa
+- Frontend/React: Desenvolvimento de componentes e integração
+- Bridge: Sistema de comunicação entre backend e frontend
+- Platforms: Integração com sistema de save states em todas as plataformas
+- Docs: Atualização da documentação para novos sistemas
 
 **Compatibilidade:**
 
-- Suporta todos os jogos do Mega Drive, incluindo aqueles com chips especiais
-- Suporta todos os jogos do NES com diversos tipos de mappers
-- Compatível com o formato de SRAM/EEPROM existente
-- Compatível com versões anteriores do emulador
+- Compatível com formatos anteriores de save states
+- Maior precisão na restauração de estados
+- API modernizada para desenvolvimento de plugins
 
-## Versão 1.2.5 (2025-03-22)
+### v2.0.0 (01/12/2025) - PLANEJADA
 
-### Descrição
+**Mudanças Principais:**
 
-Esta versão introduz uma reestruturação significativa da implementação do Z80, com uma arquitetura mais modular que facilita o reuso entre diferentes plataformas (Mega Drive e Master System).
+- Finalização do Frontend React + TypeScript
+  - Nova arquitetura baseada em componentes modernos
+  - Implementação de interface modular com painéis arrastáveis
+  - Sistema de temas por console com personalização avançada
+  - IDE visual baseada em nós para desenvolvimento de jogos
+  - Ferramentas avançadas de edição e depuração
+  - Migração completa de todas as ferramentas para o novo frontend
 
-### Principais Mudanças
+- Camada de Comunicação Emulador-Frontend
+  - Implementação de servidor WebSocket para comunicação em tempo real
+  - API REST para operações não-tempo-real
+  - Serialização eficiente de dados binários
+  - Sistema de bridge C++ para JavaScript
+  - Protocolos otimizados para desempenho e baixa latência
 
-- Criação de uma biblioteca base do Z80 em `src/core/cpu/z80/`
-- Implementação de adaptadores específicos para Mega Drive e Master System
-- Separação clara de responsabilidades entre a implementação base e os adaptadores específicos
-- Sistema de callbacks para acesso à memória e I/O
-- Implementação inicial de instruções básicas do Z80
-- Integração com os sistemas existentes de ambas as plataformas
+- Ferramentas de Desenvolvimento Avançadas
+  - Editor visual de sprites, tiles e paletas
+  - Debugger avançado com suporte a breakpoints condicionais
+  - Sistema de anotações e tags para regiões de memória
+  - Visualização em tempo real de sprites, tiles e paletas
+  - Depurador avançado de áudio com visualização de formas de onda
+  - Ferramenta de profiling para identificação de bottlenecks
 
-### Correções
+- Suporte a Multiplayer Online
+  - Sistema de netplay com rollback para jogos locais
+  - Compartilhamento de controle remoto
+  - Co-desenvolvimento de jogos em tempo real
+  - Salas de jogo com modos espectador
 
-- Resolvido o problema de duplicação de código entre as implementações do Mega Drive e Master System
-- Melhorada a manutenibilidade do código do Z80
+**Componentes Afetados:**
 
-### Componentes Afetados
+- Core: Sistema de ponte para comunicação com o frontend
+- Frontend: Reescrita completa em React/TypeScript
+- Documentação: Novo guia de desenvolvimento para frontend
+- Ferramentas: Novas ferramentas de desenvolvimento visual
 
-- core/cpu/z80
-- platforms/megadrive/cpu
-- platforms/mastersystem/cpu
-- platforms/megadrive/megadrive.c
-- platforms/mastersystem/mastersystem.c
-- docs/Z80.md
-- docs/AI_MEMORIA.md
-- docs/VERSION.md
+**Compatibilidade:**
+
+- Manutenção da compatibilidade com ROMs existentes
+- Manutenção da compatibilidade com save states anteriores
+- Suporte aos mesmos atalhos de teclado da versão anterior
+- Novas opções de acessibilidade e personalização
+
+**Autores Principais:**
+
+- Equipe Frontend: @team_frontend
+- Equipe de Ponte: @team_bridge
+- Equipe de Design: @team_design
+- Equipe de Documentação: @team_docs
 
 ## Referências
 

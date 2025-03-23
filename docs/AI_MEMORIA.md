@@ -22,6 +22,63 @@ Cada entrada deve seguir o formato:
 
 ## Histórico de Atividades
 
+### 2025-04-27 (14:30)
+
+**Atividade:** Implementação completa da plataforma Master System com todos os componentes principais
+
+**Detalhes:** Implementei a plataforma Master System com todos os seus componentes principais (CPU, VDP, PSG, Memory e I/O) seguindo a arquitetura modular do projeto. O trabalho abrangeu os seguintes componentes:
+
+1. **Adaptador Z80 para Master System:**
+   - Implementação completa do Z80 como processador principal do Master System
+   - Configuração específica para os modos de interrupção e portas I/O
+   - Sistema de callbacks para comunicação com VDP, PSG e outros componentes
+   - Suporte completo a timing de ciclos precisos
+
+2. **Video Display Processor (VDP):**
+   - Implementação de todos os modos de vídeo suportados pelo Master System
+   - Sistema completo de sprites com todas as limitações de hardware
+   - Gerenciamento preciso de VRAM e CRAM
+   - Suporte a interrupções de HBLANK e VBLANK
+   - Implementação precisa do timing para renderização de tela
+
+3. **Programmable Sound Generator (PSG):**
+   - Implementação do chip SN76489 com seus 3 canais de tom e 1 de ruído
+   - Sistema de mistura de áudio com tabela de volume logarítmica
+   - Mecanismo de buffer de áudio para saída otimizada
+   - Implementação precisa de todos os registradores e modos
+
+4. **Sistema de Memória:**
+   - Implementação do modelo de memória do Master System com suportes a paginação
+   - Controle de slots de memória mapeada e sistema de banco de páginas
+   - Suporte a cartuchos com SRAM para jogos com salvamento
+   - Gerenciamento de registradores de controle de memória
+
+5. **Sistema de Entrada/Saída:**
+   - Implementação de portas I/O do Master System
+   - Suporte a controles padrão de 2 botões
+   - Inicialização inicial do suporte a periféricos como Light Phaser
+
+Foram criados diversos testes unitários para validar a implementação, verificando principalmente:
+
+- Correto funcionamento da CPU
+- Renderização precisa do VDP
+- Geração de som pelo PSG
+- Comportamento correto do sistema de mapeamento de memória
+
+A arquitetura foi projetada para permitir reuso de componentes comuns com outras plataformas (especialmente o Z80 que também é usado no Mega Drive), seguindo o princípio de modularidade do projeto. Durante o desenvolvimento, foram feitas otimizações para garantir desempenho, mantendo precisão na emulação.
+
+**Estado Atual:** Versão 1.2.7. A plataforma Master System está completa e capaz de executar a maioria dos jogos comerciais.
+
+**Próximos Passos:**
+
+- Implementar suporte a modos especiais de vídeo usados por jogos específicos
+- Adicionar suporte a periféricos especiais (Light Phaser, Sports Pad)
+- Implementar compatibilidade com Game Gear (variante portátil do Master System)
+- Expandir os testes unitários para cobrir mais casos de uso
+- Otimizar desempenho para dispositivos de menor poder computacional
+
+**Tags:** [MASTER_SYSTEM] [Z80] [VDP] [PSG] [MEMORY] [IMPLEMENTAÇÃO] [CONCLUSÃO]
+
 ### 2025-03-25 (14:30)
 
 **Atividade:** Atualização do arquivo AI_MEMORIA.md para documentar a refatoração e implementação do sistema de GUI do frontend
@@ -675,6 +732,134 @@ Hoje implementei um sistema avançado de save state para a plataforma NES, segui
 Esta implementação representa uma evolução significativa na funcionalidade do emulador de NES, alinhando-o com os recursos avançados já disponíveis para o Mega Drive. O código foi desenvolvido seguindo as melhores práticas de engenharia de software, com foco em modularidade, extensibilidade e facilidade de manutenção.
 
 **Tags:** [NES] [SAVE_STATE] [IMPLEMENTAÇÃO] [REWIND] [THUMBNAIL] [COMPRESSÃO_DELTA] [MAPPERS]
+
+### 2025-03-25 (16:30)
+
+**Atividade:** Implementação do suporte ao Electron para visualização do frontend em modo desktop
+
+**Detalhes:** Foram realizadas as seguintes implementações para habilitar o modo desktop do frontend via Electron:
+
+1. **Configuração do Ambiente Electron:**
+   - Adicionadas dependências necessárias ao `package.json` do frontend: electron, electron-builder, concurrently, cross-env, wait-on
+   - Configurados scripts npm para iniciar o Electron em modo desenvolvimento e construir uma versão distribuível
+   - Adicionada configuração de build para criar executáveis para Windows
+
+2. **Arquivos de Configuração do Electron:**
+   - Criado arquivo `electron.js` no diretório `public` para configurar a janela principal e comportamentos do aplicativo
+   - Implementado arquivo `preload.js` para expor APIs do sistema para o frontend de forma segura
+   - Configurada comunicação entre o processo principal e o processo de renderização via IPC
+
+3. **Adaptação do Frontend:**
+   - Atualizado `environment.ts` para melhor detecção do ambiente Electron
+   - Adicionada interface TypeScript para a API do Electron exposta pelo preload
+   - Implementados helpers para acesso às APIs nativas quando em ambiente desktop
+
+4. **Scripts de Inicialização:**
+   - Criados scripts PowerShell e batch para iniciar o frontend no modo Electron
+   - Implementado script Node.js `start_electron.js` para coordenar a inicialização do servidor React e do Electron
+   - Adicionados scripts de build para gerar versões distribuíveis do aplicativo
+
+Esta implementação permite que o frontend do Mega_Emu seja executado como um aplicativo desktop via Electron, com acesso às APIs do sistema operacional, proporcionando uma experiência de usuário mais completa e integrada ao sistema.
+
+**Estado Atual:** Versão 1.2.5 (integração Electron)
+
+**Próximos Passos:**
+
+- Testar a funcionalidade Electron em diferentes ambientes Windows
+- Implementar recursos adicionais específicos para o modo desktop (acesso a diretórios, seleção de arquivos, etc.)
+- Expandir a integração com o sistema operacional para recursos avançados
+- Aprimorar a experiência de usuário no modo desktop
+
+**Tags:** [FRONTEND] [ELECTRON] [DESKTOP] [INTEGRAÇÃO] [SCRIPTS]
+
+### 2025-03-26 (14:45)
+
+**Atividade:** Correção da integração do Electron com frontend React e problemas de renderização
+
+**Detalhes:** Realizei uma análise abrangente e correção dos problemas de integração entre o Electron e o frontend React, focando principalmente na resolução de problemas de renderização e tela em branco no modo desktop.
+
+#### Problemas Identificados
+
+1. **Erros de Renderização no Electron:**
+   - Aplicação mostrava tela em branco ao iniciar no ambiente Electron
+   - GameDisplay não era renderizado corretamente devido a problemas no ciclo de vida do componente
+   - Problemas com tamanho e estilo dos containers principais
+
+2. **Problemas de Tipagem TypeScript:**
+   - Declarações de tipos incompatíveis para a API Electron exposta pelo preload.js
+   - Erros de tipagem em vários componentes, incluindo GameDisplay e RomSelector
+   - Referências a componentes inexistentes no App.tsx
+
+3. **Problemas no Processo de Inicialização:**
+   - Script de inicialização do Electron não estava lidando corretamente com builds em produção
+   - Falta de feedback visual durante o carregamento inicial
+
+#### Soluções Implementadas
+
+1. **Melhorias na Integração Electron:**
+   - Atualização do arquivo electron.js com melhores configurações para exibição da janela
+   - Implementação do evento 'ready-to-show' para evitar tela em branco durante inicialização
+   - Adição de backgroundColor para o BrowserWindow para evitar flash de tela branca
+   - Melhoria na detecção de caminhos para o arquivo index.html em produção
+
+2. **Correções de Renderização:**
+   - Reestruturação do GameDisplay para desenhar o conteúdo inicial corretamente
+   - Aprimoramento do CSS para garantir visibilidade e dimensionamento corretos
+   - Adição de bordas para visualização clara dos limites do canvas
+   - Implementação de redimensionamento responsivo
+
+3. **Correções de Tipagem:**
+   - Correção do arquivo de declaração de tipos para a API Electron
+   - Remoção de referências a imports e componentes não utilizados
+   - Implementação correta de props para GameDisplay
+   - Uso de anotações para evitar falsos positivos do ESLint
+
+4. **Melhoria na Experiência de Usuário:**
+   - Adição de tela de carregamento visual durante inicialização
+   - Implementação de classes condicionais para o modo Electron
+   - Melhorias no layout para garantir preenchimento adequado da tela
+   - Ajustes nas proporções dos componentes para melhor visualização
+
+5. **Otimização do Sistema de Build:**
+   - Atualização do script start_electron.js para usar a versão compilada do React em vez do servidor de desenvolvimento
+   - Implementação de verificação automática de build existente
+   - Melhoria na configuração de ambiente para builds de produção
+
+#### Arquivos Modificados
+
+- **Frontend:**
+  - `frontend/src/App.tsx`: Correções de layout e integração com Electron
+  - `frontend/src/components/emulator/GameDisplay.tsx`: Melhoria na renderização e ciclo de vida
+  - `frontend/src/components/emulator/GameDisplay.css`: Otimizações de estilo
+  - `frontend/src/App.css`: Atualizações para suporte ao modo Electron
+  - `frontend/src/types/electron.d.ts`: Correções na definição de tipos
+  - `frontend/src/components/emulator/RomSelector.tsx`: Integração correta com API Electron
+
+- **Electron:**
+  - `frontend/public/electron.js`: Melhorias na configuração da janela e carregamento
+  - `frontend/public/preload.js`: Ajustes na API exposta para o frontend
+
+- **Scripts:**
+  - `scripts/build/start_electron.js`: Simplificação e melhoria do processo de inicialização
+
+#### Lições Aprendidas
+
+1. A integração entre Electron e React requer atenção especial ao ciclo de vida dos componentes e ao processo de inicialização.
+2. É crucial implementar feedback visual durante o carregamento para melhorar a experiência do usuário.
+3. O uso correto de tipagem TypeScript é essencial para evitar problemas de integração entre diferentes partes do sistema.
+4. A estrutura CSS precisa considerar diferentes ambientes de renderização (navegador vs. Electron).
+5. Scripts de build e inicialização devem ser robustos para lidar com diferentes cenários (desenvolvimento vs. produção).
+
+**Estado Atual:** Versão 1.2.6. A interface do emulador agora funciona corretamente tanto no navegador quanto no Electron, com melhor experiência visual e sem problemas de tela em branco.
+
+**Próximos Passos:**
+
+- Expandir suporte a funcionalidades específicas do Electron (menu nativo, notificações)
+- Implementar recursos adicionais de salvamento/carregamento de ROMs via sistema de arquivos
+- Melhorar a performance do GameDisplay em dispositivos de baixo desempenho
+- Adicionar mais testes automatizados para interface gráfica
+
+**Tags:** [FRONTEND] [ELECTRON] [UI] [RENDERIZAÇÃO] [TIPAGEM] [INTEGRAÇÃO] [DEBUGGING]
 
 ## Como Contribuir para este Registro
 

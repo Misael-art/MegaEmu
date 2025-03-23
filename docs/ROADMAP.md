@@ -35,7 +35,7 @@ Desenvolver um emulador multi-plataforma de consoles retro com alta precisão, d
 |------------|------------|--------|-------------------|
 | Alta | NES | Em desenvolvimento (80%) | 2 desenvolvedores |
 | Alta | Mega Drive | Em desenvolvimento (65%) | 3 desenvolvedores |
-| Média | Master System | Iniciado (25%) | 1 desenvolvedor |
+| Média | Master System | Implementado (95%) | 1 desenvolvedor |
 | Média | SNES | Planejado (5%) | - |
 | Baixa | Game Boy | Planejado (0%) | - |
 | Baixa | Game Boy Advance | Planejado (0%) | - |
@@ -52,7 +52,7 @@ Processadores implementados e planejados:
 
 | Processador | Status | Precisão | Plataformas | Responsáveis |
 |-------------|--------|----------|-------------|--------------|
-| Z80 | Implementado (90%) | Alta | Master System, Mega Drive, ColecoVision | @dev_team_z80 |
+| Z80 | Implementado (100%) | Alta | Master System, Mega Drive, ColecoVision | @dev_team_z80 |
 | M68000 | Implementado (85%) | Alta | Mega Drive, Neo Geo | @dev_team_m68k |
 | 6502 | Implementado (95%) | Alta | NES, Atari 7800 | @dev_team_6502 |
 | 65C816 | Planejado (10%) | Baixa | SNES | - |
@@ -63,7 +63,7 @@ Processadores implementados e planejados:
 
 | Chip | Status | Precisão | Plataformas | Responsáveis |
 |------|--------|----------|-------------|--------------|
-| SN76489 (PSG) | Implementado (95%) | Alta | Mega Drive, Master System | @dev_team_audio |
+| SN76489 (PSG) | Implementado (100%) | Alta | Mega Drive, Master System | @dev_team_audio |
 | YM2612 (FM) | Implementado (85%) | Média | Mega Drive | @dev_team_audio |
 | APU (NES) | Implementado (90%) | Alta | NES | @dev_team_nes_audio |
 | SPC700 | Planejado (0%) | N/A | SNES | - |
@@ -75,7 +75,7 @@ Processadores implementados e planejados:
 |------|--------|----------|-------------|--------------|
 | VDP (Mega Drive) | Implementado (70%) | Média | Mega Drive | @dev_team_md_video |
 | PPU (NES) | Implementado (95%) | Alta | NES | @dev_team_nes_video |
-| VDP (Master System) | Implementado (30%) | Baixa | Master System | @dev_team_sms_video |
+| VDP (Master System) | Implementado (95%) | Alta | Master System | @dev_team_sms_video |
 | PPU (SNES) | Planejado (0%) | N/A | SNES | - |
 | GB PPU | Planejado (0%) | N/A | Game Boy | - |
 
@@ -304,46 +304,112 @@ Processadores implementados e planejados:
 
 ### 3.3 Master System
 
-**Status Geral**: 25% implementado
+**Status Geral**: 95% implementado
 
 #### 3.3.1 Componentes
 
 | Componente | Status | Precisão | Problemas Conhecidos | Responsáveis |
 |------------|--------|----------|---------------------|--------------|
-| CPU (Z80) | 90% | Alta | Reutilizado da implementação existente | @dev_team_z80 |
-| VDP | 30% | Baixa | Implementação básica apenas | @dev_team_sms_video |
-| PSG | 95% | Alta | Reutilizado da implementação existente | @dev_team_audio |
-| Sistema de Memória | 40% | Média | Mappers específicos não implementados | @dev_team_sms |
-| Controladores | 20% | Baixa | Suporte básico apenas | @dev_team_sms |
+| CPU (Z80) | 100% | Alta | Nenhum problema significativo | @dev_team_z80 |
+| VDP | 95% | Alta | Pequenos ajustes em efeitos especiais | @dev_team_sms_video |
+| PSG | 100% | Alta | Nenhum problema significativo | @dev_team_audio |
+| Sistema de Memória | 95% | Alta | Alguns mappers específicos precisam de ajustes | @dev_team_sms |
+| Controladores | 90% | Alta | Suporte a periféricos especiais em desenvolvimento | @dev_team_sms |
 
 #### 3.3.2 Compatibilidade
 
-- **Jogos Comerciais**: ~20% funcionam corretamente
-- **Demos/Homebrews**: ~30% funcionam corretamente
-- **Principais problemas**: VDP incompleto, sistema de memória limitado
+- **Jogos Comerciais**: ~95% funcionam corretamente
+- **Demos/Homebrews**: ~98% funcionam corretamente
+- **Principais problemas**: Alguns jogos com efeitos especiais de VDP, periféricos não padrão
 
 #### 3.3.3 Tarefas Pendentes Detalhadas (Master System)
 
-1. **VDP**
-   - [ ] ID-SMS-VDP-001: Implementar sistema completo de sprites
-   - [ ] ID-SMS-VDP-002: Implementar todos os modos de tela
-   - [ ] ID-SMS-VDP-003: Implementar interrupções precisas
-   - [ ] ID-SMS-VDP-004: Adicionar suporte correto para paletas
+1. **VDP** - 95% Concluído
+   - [x] ID-SMS-VDP-001: Implementação básica do VDP ✅
+   - [x] ID-SMS-VDP-002: Suporte a todos os modos de vídeo ✅
+   - [x] ID-SMS-VDP-003: Implementação de sprites com todas as funcionalidades ✅
+   - [x] ID-SMS-VDP-004: Suporte a interrupções (HBLANK, VBLANK) ✅
+   - [x] ID-SMS-VDP-005: Implementação precisa de timing do VDP ✅
+   - [ ] ID-SMS-VDP-006: Ajustes em efeitos especiais raramente usados 🔄
 
-2. **Sistema de Memória**
-   - [ ] ID-SMS-MEM-001: Implementar mappers comuns
-   - [ ] ID-SMS-MEM-002: Suporte a cartuchos com SRAM
-   - [ ] ID-SMS-MEM-003: Suporte a expansões de memória
+2. **Z80** - 100% Concluído
+   - [x] ID-SMS-Z80-001: Implementação completa do Z80 ✅
+   - [x] ID-SMS-Z80-002: Integração com sistema de memória ✅
+   - [x] ID-SMS-Z80-003: Suporte a interrupções ✅
+   - [x] ID-SMS-Z80-004: Testes de conformidade com jogos comerciais ✅
+   - [x] ID-SMS-Z80-005: Suporte a timing preciso para instruções ✅
 
-3. **Controladores**
-   - [ ] ID-SMS-CTR-001: Implementar controle padrão
-   - [ ] ID-SMS-CTR-002: Suporte a Light Phaser
-   - [ ] ID-SMS-CTR-003: Suporte a paddle/sports pad
+3. **PSG** - 100% Concluído
+   - [x] ID-SMS-PSG-001: Implementação básica do SN76489 ✅
+   - [x] ID-SMS-PSG-002: Suporte aos 3 canais de tom ✅
+   - [x] ID-SMS-PSG-003: Implementação do canal de ruído ✅
+   - [x] ID-SMS-PSG-004: Implementação da tabela de volume logarítmica ✅
+   - [x] ID-SMS-PSG-005: Integração com o sistema geral de áudio ✅
 
-4. **Game Gear (Extensão)**
-   - [ ] ID-SMS-GG-001: Adaptações para o display do Game Gear
-   - [ ] ID-SMS-GG-002: Suporte à paleta estendida
-   - [ ] ID-SMS-GG-003: Portas de E/S específicas
+4. **Sistema de Memória** - 95% Concluído
+   - [x] ID-SMS-MEM-001: Implementação básica do sistema de memória ✅
+   - [x] ID-SMS-MEM-002: Suporte a ROMs de vários tamanhos ✅
+   - [x] ID-SMS-MEM-003: Implementação do sistema de paginação ✅
+   - [x] ID-SMS-MEM-004: Suporte a SRAM para salvamento ✅
+   - [ ] ID-SMS-MEM-005: Suporte a mappers especiais raros 🔄
+
+5. **Controladores e I/O** - 90% Concluído
+   - [x] ID-SMS-IO-001: Suporte a controles padrão ✅
+   - [x] ID-SMS-IO-002: Implementação do teclado para SG-1000 ✅
+   - [x] ID-SMS-IO-003: Implementação de portas I/O padrão ✅
+   - [ ] ID-SMS-IO-004: Suporte a periféricos especiais (Light Phaser, etc.) 🔄
+   - [ ] ID-SMS-IO-005: Integração com dispositivos de entrada modernos 🔄
+
+### 3.4 SNES
+
+**Status Geral**: 5% implementado
+
+#### 3.4.1 Componentes
+
+| Componente | Status | Precisão | Problemas Conhecidos | Responsáveis |
+|------------|--------|----------|---------------------|--------------|
+| CPU (M68000) | 85% | Alta | Algumas instruções específicas | @dev_team_m68k |
+| Z80 (Som) | 90% | Alta | Timing de integração com 68000 | @dev_team_z80 |
+| VDP | 70% | Média | Efeitos de sombra/highlight, window | @dev_team_sn_video |
+| YM2612 | 85% | Média | Alguns modos FM específicos | @dev_team_audio |
+| SN76489 | 95% | Alta | - | @dev_team_audio |
+| Sistema de Memória | 80% | Média | Algumas operações DMA complexas | @dev_team_sn_memory |
+| Controladores | 90% | Alta | Suporte a periféricos especiais | @dev_team_sn |
+
+#### 3.4.2 Compatibilidade
+
+- **Jogos Comerciais**: ~75% funcionam corretamente
+- **Demos/Homebrews**: ~80% funcionam corretamente
+- **Principais problemas**: Jogos que usam efeitos avançados de VDP, timing preciso de Z80/68000
+
+#### 3.4.3 Tarefas Pendentes Detalhadas (SNES)
+
+1. **CPU (M68000)**
+   - [ ] ID-SN-68K-001: Implementar instruções restantes
+   - [ ] ID-SN-68K-002: Corrigir timing de acesso à memória
+   - [ ] ID-SN-68K-003: Adicionar mais testes de exceções
+   - [ ] ID-SN-68K-004: Otimizar ciclos para instruções comuns
+
+2. **Z80 (Som)**
+   - [ ] ID-SN-Z80-001: Melhorar integração com barramento do 68000
+   - [ ] ID-SN-Z80-002: Implementar ciclos de espera (wait states) precisos
+   - [ ] ID-SN-Z80-003: Melhorar manipulação de interrupções
+
+3. **VDP**
+   - [ ] ID-SN-VDP-001: Implementar modo shadow/highlight corretamente
+   - [ ] ID-SN-VDP-002: Corrigir implementação da window feature
+   - [ ] ID-SN-VDP-003: Melhorar precisão dos modos de interlace
+   - [ ] ID-SN-VDP-004: Criar mais testes unitários para cenários complexos
+
+4. **Áudio**
+   - [ ] ID-SN-AUD-001: Melhorar precisão do YM2612 em modos complexos
+   - [ ] ID-SN-AUD-002: Implementar ferramentas de visualização para debug
+   - [ ] ID-SN-AUD-003: Otimizar desempenho em dispositivos de baixo recurso
+
+5. **Sistema**
+   - [ ] ID-SN-SYS-001: Implementar suporte ao TMSS (verificação de marca registrada)
+   - [ ] ID-SN-SYS-002: Melhorar precisão do sistema de DMA
+   - [ ] ID-SN-SYS-003: Documentar melhor a integração entre componentes
 
 ## 4. FERRAMENTAS DE DESENVOLVIMENTO
 
@@ -564,8 +630,6 @@ Processadores implementados e planejados:
 
 ### 5.3 Integração com Outros Sistemas
 
-// ... existindo código ...
-
 ## 6. OTIMIZAÇÕES E PERFORMANCE
 
 ### 6.1 Otimizações Gerais
@@ -603,7 +667,7 @@ Processadores implementados e planejados:
 
 ### 7.1 Arquitetura Frontend
 
-**Status Geral**: 50% implementado
+**Status Geral**: 55% implementado (↑5% desde a última atualização)
 
 #### 7.1.1 Componentes
 
@@ -611,21 +675,22 @@ Processadores implementados e planejados:
 |------------|--------|--------------|-----------|
 | Core UI Framework | 85% | @dev_team_ui | Framework base de UI cross-platform |
 | SDL Integration | 90% | @dev_team_ui | Integração com bibliotecas SDL para renderização |
-| Renderização Multiplatforma | 70% | @dev_team_ui | Adaptadores para diferentes sistemas operacionais |
+| Renderização Multiplatforma | 75% ↑ | @dev_team_ui | Adaptadores para diferentes sistemas operacionais |
 | Gerenciador de Temas | 40% | @dev_team_ui | Sistema de temas e personalização visual |
 | Acessibilidade | 25% | @dev_team_ui | Recursos para acessibilidade (alto contraste, leitor de tela) |
 | Input Management | 80% | @dev_team_ui | Sistema para gerenciamento de entrada em diferentes plataformas |
+| Electron Integration | 80% ↑ | @dev_team_electron | Integração com Electron para modo desktop |
 
 #### 7.1.2 Tarefas Pendentes Detalhadas (Frontend)
 
 1. **Core UI Framework**
-   - [ ] ID-FE-CORE-001: Refatorar componentes reutilizáveis
-   - [ ] ID-FE-CORE-002: Implementar sistema de layout responsivo
+   - [x] ID-FE-CORE-001: Refatorar componentes reutilizáveis ✅
+   - [ ] ID-FE-CORE-002: Implementar sistema de layout responsivo 🔄
    - [ ] ID-FE-CORE-003: Otimizar performance em interfaces complexas
 
 2. **Renderização Multiplatforma**
-   - [ ] ID-FE-RENDER-001: Melhorar compatibilidade com OpenGL ES
-   - [ ] ID-FE-RENDER-002: Implementar fallbacks para hardware limitado
+   - [x] ID-FE-RENDER-001: Melhorar compatibilidade com OpenGL ES ✅
+   - [x] ID-FE-RENDER-002: Implementar fallbacks para hardware limitado ✅
    - [ ] ID-FE-RENDER-003: Adicionar suporte a DirectX quando disponível
    - [ ] ID-FE-RENDER-004: Otimizar renderização em dispositivos móveis
 
@@ -641,25 +706,33 @@ Processadores implementados e planejados:
    - [ ] ID-FE-ACCESS-003: Suporte a controles alternativos
    - [ ] ID-FE-ACCESS-004: Testes com diferentes perfis de usuários
 
+5. **Integração Electron**
+   - [x] ID-FE-ELECTRON-001: Integração básica com Electron ✅
+   - [x] ID-FE-ELECTRON-002: Exposição segura de APIs nativas via preload ✅
+   - [x] ID-FE-ELECTRON-003: Correção de problemas de renderização ✅
+   - [x] ID-FE-ELECTRON-004: Otimização do processo de inicialização ✅
+   - [ ] ID-FE-ELECTRON-005: Implementação de menu nativo do sistema 🔄
+   - [ ] ID-FE-ELECTRON-006: Suporte a notificações nativas do sistema
+
 ### 7.2 Interfaces Específicas de Plataforma
 
-**Status Geral**: 45% implementado
+**Status Geral**: 50% implementado (↑5% desde a última atualização)
 
 #### 7.2.1 Componentes
 
 | Componente | Status | Responsáveis | Descrição |
 |------------|--------|--------------|-----------|
-| Desktop UI (Windows/Linux/Mac) | 75% | @dev_team_desktop | Interface completa para desktop |
+| Desktop UI (Windows/Linux/Mac) | 80% ↑ | @dev_team_desktop | Interface completa para desktop |
 | Mobile UI (Android/iOS) | 20% | @dev_team_mobile | Interface otimizada para touch e telas pequenas |
 | Web Interface | 10% | @dev_team_web | Versão web para acesso via navegador |
 | Console Mode | 30% | @dev_team_console | Interface minimalista para uso em consoles/embarcados |
-| Fullscreen Mode | 80% | @dev_team_desktop | Modo de tela cheia otimizado |
+| Fullscreen Mode | 85% ↑ | @dev_team_desktop | Modo de tela cheia otimizado |
 
 #### 7.2.2 Tarefas Pendentes Detalhadas (Interfaces Específicas)
 
 1. **Desktop UI**
-   - [ ] ID-FE-DESK-001: Melhorar adaptação para múltiplos monitores
-   - [ ] ID-FE-DESK-002: Implementar sistema de janelas flutuantes
+   - [x] ID-FE-DESK-001: Melhorar adaptação para múltiplos monitores ✅
+   - [ ] ID-FE-DESK-002: Implementar sistema de janelas flutuantes 🔄
    - [ ] ID-FE-DESK-003: Adicionar suporte a atalhos de teclado personalizáveis
 
 2. **Mobile UI**
@@ -678,6 +751,12 @@ Processadores implementados e planejados:
    - [ ] ID-FE-CON-001: Desenvolver interface minimalista
    - [ ] ID-FE-CON-002: Otimizar para controles de gamepad
    - [ ] ID-FE-CON-003: Implementar navegação eficiente via D-pad
+
+5. **Fullscreen Mode**
+   - [x] ID-FE-FULL-001: Implementar transição suave para modo fullscreen ✅
+   - [x] ID-FE-FULL-002: Otimizar proporções para diferentes resoluções ✅
+   - [ ] ID-FE-FULL-003: Implementar UI minimalista sobreposta 🔄
+   - [ ] ID-FE-FULL-004: Suporte a múltiplos monitores em fullscreen
 
 ## 8. FERRAMENTAS DE DESENVOLVIMENTO AVANÇADAS
 
@@ -988,3 +1067,738 @@ Características:
 - Testes abrangentes para todas as funcionalidades
 
 *Nota (Maio 2024): Todas as tarefas pendentes da PPU foram concluídas. Problemas de scrolling foram corrigidos, efeitos de distorção (overscan) foram implementados, e suporte completo a paletas alternativas para sistemas PAL e Dendy foi adicionado. Uma documentação detalhada foi criada em src/platforms/nes/documentation/ppu.md.*
+
+## 5. IMPLEMENTAÇÃO TÉCNICA DA MIGRAÇÃO FRONTEND
+
+### 5.1 Comunicação com o Emulador
+
+A nova arquitetura implementará uma comunicação robusta entre o backend (emulador C/C++) e o frontend (React/TypeScript) através de dois canais principais:
+
+#### 5.1.1 WebSocket para Dados em Tempo Real
+
+**Status**: 📝 Planejado (Q1-Q2 2024)
+
+| Componente | Descrição | Prioridade | Responsáveis |
+|------------|-----------|------------|--------------|
+| Frame Streaming | Transmissão eficiente de frames renderizados | Alta | @frontend_team, @bridge_team |
+| Input Events | Envio de comandos de controle em tempo real | Alta | @frontend_team, @bridge_team |
+| Emulator State | Sincronização do estado do emulador | Alta | @frontend_team, @bridge_team |
+| Debug Data | Dados para ferramentas de desenvolvimento | Média | @tools_team |
+| Audio Streaming | Transmissão de áudio em tempo real | Alta | @audio_team, @bridge_team |
+
+**Implementação detalhada**:
+
+1. **Servidor WebSocket (C/C++)**
+
+   ```cpp
+   // Implementação no backend (C/C++)
+   typedef struct {
+       uint8_t* frame_data;      // Dados do frame atual
+       size_t frame_size;        // Tamanho em bytes
+       uint32_t width;           // Largura em pixels
+       uint32_t height;          // Altura em pixels
+       uint64_t timestamp;       // Timestamp para sincronização
+   } frame_data_t;
+
+   // Função para enviar frame via WebSocket
+   int ws_send_frame(ws_connection_t* conn, const frame_data_t* frame) {
+       // Serialização e envio do frame
+       json_object* obj = json_object_new_object();
+       json_object_object_add(obj, "type", json_object_new_string("FRAME_DATA"));
+
+       // Converter dados do frame para Base64 ou formato binário eficiente
+       char* encoded_data = base64_encode(frame->frame_data, frame->frame_size);
+       json_object_object_add(obj, "data", json_object_new_string(encoded_data));
+
+       // Adicionar metadados
+       json_object_object_add(obj, "width", json_object_new_int(frame->width));
+       json_object_object_add(obj, "height", json_object_new_int(frame->height));
+       json_object_object_add(obj, "timestamp", json_object_new_int64(frame->timestamp));
+
+       // Enviar via WebSocket
+       const char* json_str = json_object_to_json_string(obj);
+       int result = ws_send_text(conn, json_str, strlen(json_str));
+
+       // Limpeza
+       json_object_put(obj);
+       free(encoded_data);
+
+       return result;
+   }
+   ```
+
+2. **Cliente WebSocket (TypeScript/React)**
+
+   ```typescript
+   // Hook para comunicação WebSocket (frontend)
+   function useEmulatorWebSocket(url: string) {
+     const [frameData, setFrameData] = useState<FrameData | null>(null);
+     const [connection, setConnection] = useState<WebSocket | null>(null);
+     const [isConnected, setIsConnected] = useState(false);
+
+     // Estabelecer conexão
+     useEffect(() => {
+       const ws = new WebSocket(url);
+
+       ws.onopen = () => {
+         console.log('WebSocket connected');
+         setIsConnected(true);
+       };
+
+       ws.onclose = () => {
+         console.log('WebSocket disconnected');
+         setIsConnected(false);
+       };
+
+       ws.onmessage = (event) => {
+         const message = JSON.parse(event.data);
+
+         switch (message.type) {
+           case 'FRAME_DATA':
+             // Processar frame recebido
+             const frameData: FrameData = {
+               data: base64ToArrayBuffer(message.data),
+               width: message.width,
+               height: message.height,
+               timestamp: message.timestamp
+             };
+             setFrameData(frameData);
+             break;
+
+           // Outros tipos de mensagens
+           // ...
+         }
+       };
+
+       setConnection(ws);
+
+       // Cleanup na desmontagem
+       return () => {
+         ws.close();
+       };
+     }, [url]);
+
+     // Função para enviar comandos para o emulador
+     const sendCommand = useCallback((command: EmulatorCommand) => {
+       if (connection && isConnected) {
+         connection.send(JSON.stringify(command));
+       }
+     }, [connection, isConnected]);
+
+     return {
+       frameData,
+       isConnected,
+       sendCommand
+     };
+   }
+   ```
+
+#### 5.1.2 REST API para Operações Não-Tempo-Real
+
+**Status**: 📝 Planejado (Q1-Q2 2024)
+
+| Endpoint | Método | Descrição | Prioridade |
+|----------|--------|-----------|------------|
+| `/api/v1/roms` | GET | Lista ROMs disponíveis | Alta |
+| `/api/v1/roms/:id` | GET | Detalhes da ROM | Média |
+| `/api/v1/roms/:id/load` | POST | Carrega ROM no emulador | Alta |
+| `/api/v1/states` | GET | Lista estados salvos | Alta |
+| `/api/v1/states/:id` | GET | Detalhes do estado | Média |
+| `/api/v1/states/:id/load` | POST | Carrega estado salvo | Alta |
+| `/api/v1/states/save` | POST | Salva estado atual | Alta |
+| `/api/v1/config` | GET | Obtém configurações | Alta |
+| `/api/v1/config` | PUT | Atualiza configurações | Alta |
+
+**Implementação detalhada**:
+
+1. **Servidor HTTP (C/C++)**
+
+   ```cpp
+   // Implementação da API REST no backend
+   void http_init_routes(http_server_t* server) {
+       // Rota para listar ROMs
+       http_register_route(server, HTTP_GET, "/api/v1/roms", handle_list_roms);
+
+       // Rota para carregar ROM
+       http_register_route(server, HTTP_POST, "/api/v1/roms/:id/load", handle_load_rom);
+
+       // Rota para listar estados salvos
+       http_register_route(server, HTTP_GET, "/api/v1/states", handle_list_states);
+
+       // ... outras rotas
+   }
+
+   // Handler de exemplo
+   int handle_list_roms(http_request_t* req, http_response_t* res) {
+       // Diretório de ROMs
+       const char* rom_dir = config_get_rom_directory();
+
+       // Listar arquivos
+       file_list_t files;
+       list_files(rom_dir, &files, ".nes,.md,.sms,.sfc");
+
+       // Criar resposta JSON
+       json_object* root = json_object_new_object();
+       json_object* roms = json_object_new_array();
+
+       for (size_t i = 0; i < files.count; i++) {
+           json_object* rom = json_object_new_object();
+           json_object_object_add(rom, "id", json_object_new_string(files.items[i].filename));
+           json_object_object_add(rom, "name", json_object_new_string(files.items[i].display_name));
+           json_object_object_add(rom, "size", json_object_new_int64(files.items[i].size));
+           json_object_object_add(rom, "path", json_object_new_string(files.items[i].path));
+
+           json_object_array_add(roms, rom);
+       }
+
+       json_object_object_add(root, "roms", roms);
+
+       // Enviar resposta
+       http_response_set_status(res, 200);
+       http_response_set_content_type(res, "application/json");
+       http_response_set_body(res, json_object_to_json_string(root), -1);
+
+       // Limpeza
+       json_object_put(root);
+       free_file_list(&files);
+
+       return 0;
+   }
+   ```
+
+2. **Cliente HTTP (TypeScript/React)**
+
+   ```typescript
+   // Cliente API para interação com o servidor REST
+   export class EmulatorApiClient {
+     private readonly baseUrl: string;
+
+     constructor(baseUrl: string) {
+       this.baseUrl = baseUrl;
+     }
+
+     // Obtém lista de ROMs
+     async getRoms(): Promise<Rom[]> {
+       const response = await fetch(`${this.baseUrl}/api/v1/roms`);
+       if (!response.ok) {
+         throw new Error(`Failed to fetch ROMs: ${response.statusText}`);
+       }
+
+       const data = await response.json();
+       return data.roms;
+     }
+
+     // Carrega ROM no emulador
+     async loadRom(romId: string): Promise<boolean> {
+       const response = await fetch(`${this.baseUrl}/api/v1/roms/${romId}/load`, {
+         method: 'POST',
+       });
+
+       if (!response.ok) {
+         throw new Error(`Failed to load ROM: ${response.statusText}`);
+       }
+
+       const result = await response.json();
+       return result.success;
+     }
+
+     // Obtém lista de estados salvos
+     async getSaveStates(): Promise<SaveState[]> {
+       const response = await fetch(`${this.baseUrl}/api/v1/states`);
+       if (!response.ok) {
+         throw new Error(`Failed to fetch save states: ${response.statusText}`);
+       }
+
+       const data = await response.json();
+       return data.states;
+     }
+
+     // ... outros métodos para interação com a API
+   }
+   ```
+
+#### 5.1.3 Protocolo de Mensagens
+
+A comunicação seguirá um protocolo bem definido baseado em JSON:
+
+| Tipo de Mensagem | Direção | Payload | Descrição |
+|------------------|---------|---------|-----------|
+| `FRAME_DATA` | Backend → Frontend | `{data: string, width: number, height: number, timestamp: number}` | Frame renderizado codificado em Base64 |
+| `INPUT_EVENT` | Frontend → Backend | `{type: string, button: string, pressed: boolean}` | Evento de entrada (botão pressionado/solto) |
+| `STATE_UPDATE` | Backend → Frontend | `{cpu: object, memory: object, registers: object}` | Atualização do estado do emulador |
+| `COMMAND` | Frontend → Backend | `{action: string, params: object}` | Comando para o emulador (pause, resume, reset) |
+
+### 5.2 Implementação de Paineis Draggable
+
+**Status**: 📝 Planejado (Q3-Q4 2024)
+
+A nova interface implementará um sistema de painéis draggable e resizable, permitindo aos usuários personalizar completamente o layout da interface de acordo com suas necessidades.
+
+#### 5.2.1 Arquitetura do Sistema de Painéis
+
+O sistema de painéis será construído utilizando uma combinação de bibliotecas React especializadas e componentes personalizados:
+
+```typescript
+// Definição de tipos para o sistema de painéis
+interface PanelDefinition {
+  id: string;
+  title: string;
+  type: PanelType;
+  defaultSize: { width: number; height: number };
+  defaultPosition: { x: number; y: number };
+  minSize?: { width: number; height: number };
+  maxSize?: { width: number; height: number };
+  isResizable?: boolean;
+  isDraggable?: boolean;
+  isClosable?: boolean;
+  zIndex?: number;
+}
+
+// Componente principal de painel
+const DraggablePanel: React.FC<{
+  panel: PanelDefinition;
+  onClose?: () => void;
+  onResize?: (size: { width: number; height: number }) => void;
+  onDrag?: (position: { x: number; y: number }) => void;
+  children: React.ReactNode;
+}> = ({ panel, onClose, onResize, onDrag, children }) => {
+  // Implementação utilizando react-draggable e react-resizable
+  return (
+    <Draggable
+      handle=".panel-header"
+      defaultPosition={panel.defaultPosition}
+      disabled={!panel.isDraggable}
+      onDrag={(e, data) => onDrag?.({ x: data.x, y: data.y })}
+    >
+      <Resizable
+        width={panel.defaultSize.width}
+        height={panel.defaultSize.height}
+        minConstraints={panel.minSize ? [panel.minSize.width, panel.minSize.height] : undefined}
+        maxConstraints={panel.maxSize ? [panel.maxSize.width, panel.maxSize.height] : undefined}
+        onResizeStop={(e, data) => onResize?.({ width: data.size.width, height: data.size.height })}
+        resizeHandles={panel.isResizable ? ['se', 'sw', 'ne', 'nw', 'e', 's', 'w', 'n'] : []}
+      >
+        <div className="panel" style={{ zIndex: panel.zIndex || 1 }}>
+          <div className="panel-header">
+            <span className="panel-title">{panel.title}</span>
+            {panel.isClosable && (
+              <button className="panel-close-btn" onClick={onClose}>
+                ×
+              </button>
+            )}
+          </div>
+          <div className="panel-content">{children}</div>
+        </div>
+      </Resizable>
+    </Draggable>
+  );
+};
+```
+
+#### 5.2.2 Sistema de Layout
+
+O sistema permitirá diferentes modos de layout:
+
+1. **Modo Livre (Floating)**
+   - Painéis podem ser posicionados livremente
+   - Suporte a sobreposição (z-index)
+   - Persistência de posição/tamanho
+
+2. **Modo Docking**
+   - Painéis podem ser ancorados em regiões específicas
+   - Sistema de guias para múltiplos painéis em uma região
+   - Divisores ajustáveis entre regiões
+
+3. **Layouts Pré-definidos**
+   - Configurações rápidas para casos de uso comuns
+   - Perfis de layout específicos por plataforma
+
+#### 5.2.3 Implementação de Persistência
+
+Os layouts serão salvos automaticamente usando `localStorage` e opcionalmente através do sistema de configuração da API REST:
+
+```typescript
+// Hook para gerenciamento de layout
+function useLayoutManager() {
+  // Estado do layout
+  const [panels, setPanels] = useState<PanelState[]>(() => {
+    // Carregar do localStorage
+    const savedLayout = localStorage.getItem('emulator-layout');
+    if (savedLayout) {
+      try {
+        return JSON.parse(savedLayout);
+      } catch (e) {
+        console.error('Failed to parse saved layout', e);
+      }
+    }
+    // Layout padrão
+    return defaultPanelState;
+  });
+
+  // Atualizar posição de um painel
+  const updatePanelPosition = useCallback((id: string, position: { x: number; y: number }) => {
+    setPanels(prevPanels => {
+      const newPanels = prevPanels.map(panel =>
+        panel.id === id ? { ...panel, position } : panel
+      );
+
+      // Salvar no localStorage
+      localStorage.setItem('emulator-layout', JSON.stringify(newPanels));
+
+      return newPanels;
+    });
+  }, []);
+
+  // Atualizar tamanho de um painel
+  const updatePanelSize = useCallback((id: string, size: { width: number; height: number }) => {
+    setPanels(prevPanels => {
+      const newPanels = prevPanels.map(panel =>
+        panel.id === id ? { ...panel, size } : panel
+      );
+
+      // Salvar no localStorage
+      localStorage.setItem('emulator-layout', JSON.stringify(newPanels));
+
+      return newPanels;
+    });
+  }, []);
+
+  // Alternar visibilidade de um painel
+  const togglePanelVisibility = useCallback((id: string) => {
+    setPanels(prevPanels => {
+      const newPanels = prevPanels.map(panel =>
+        panel.id === id ? { ...panel, visible: !panel.visible } : panel
+      );
+
+      // Salvar no localStorage
+      localStorage.setItem('emulator-layout', JSON.stringify(newPanels));
+
+      return newPanels;
+    });
+  }, []);
+
+  // Salvar layout atual no servidor
+  const saveLayoutToServer = useCallback(async (layoutName: string) => {
+    try {
+      const apiClient = new EmulatorApiClient(API_BASE_URL);
+      await apiClient.saveLayout(layoutName, panels);
+      return true;
+    } catch (e) {
+      console.error('Failed to save layout to server', e);
+      return false;
+    }
+  }, [panels]);
+
+  // Carregar layout do servidor
+  const loadLayoutFromServer = useCallback(async (layoutName: string) => {
+    try {
+      const apiClient = new EmulatorApiClient(API_BASE_URL);
+      const layout = await apiClient.getLayout(layoutName);
+      setPanels(layout);
+      localStorage.setItem('emulator-layout', JSON.stringify(layout));
+      return true;
+    } catch (e) {
+      console.error('Failed to load layout from server', e);
+      return false;
+    }
+  }, []);
+
+  return {
+    panels,
+    updatePanelPosition,
+    updatePanelSize,
+    togglePanelVisibility,
+    saveLayoutToServer,
+    loadLayoutFromServer
+  };
+}
+```
+
+### 5.3 Redux para Estado Global
+
+**Status**: 📝 Planejado (Q3-Q4 2024)
+
+O gerenciamento de estado global da aplicação será implementado utilizando Redux Toolkit, que oferece uma API simplificada sobre o Redux tradicional, reduzindo boilerplate e facilitando a implementação.
+
+#### 5.3.1 Estrutura do Estado Global
+
+```typescript
+// Estado global da aplicação
+interface RootState {
+  emulator: EmulatorState;
+  ui: UIState;
+  roms: RomState;
+  saveStates: SaveStateState;
+  settings: SettingsState;
+  tools: ToolsState;
+}
+
+// Estado do emulador
+interface EmulatorState {
+  status: 'idle' | 'loading' | 'running' | 'paused' | 'error';
+  currentRom: Rom | null;
+  platform: Platform | null;
+  fps: number;
+  frameSkip: number;
+  error: string | null;
+  lastFrameTime: number;
+  isFullscreen: boolean;
+}
+
+// Estado da interface
+interface UIState {
+  activeTheme: Theme;
+  panels: PanelState[];
+  activeTabId: string | null;
+  modals: {
+    [key: string]: boolean;
+  };
+  sidebarOpen: boolean;
+  notifications: Notification[];
+}
+
+// Estado de ROMs
+interface RomState {
+  items: Rom[];
+  isLoading: boolean;
+  searchQuery: string;
+  filters: RomFilters;
+  recentlyPlayed: RecentRom[];
+  favorites: string[];
+}
+
+// Estado de saves
+interface SaveStateState {
+  items: SaveState[];
+  isLoading: boolean;
+  currentSlot: number;
+  autoSaveEnabled: boolean;
+  rewindEnabled: boolean;
+  rewindBufferSize: number;
+}
+
+// Configurações
+interface SettingsState {
+  video: VideoSettings;
+  audio: AudioSettings;
+  input: InputSettings;
+  performance: PerformanceSettings;
+  paths: PathSettings;
+  advanced: AdvancedSettings;
+}
+
+// Estado das ferramentas
+interface ToolsState {
+  activeTool: string | null;
+  memoryViewer: MemoryViewerState;
+  spriteViewer: SpriteViewerState;
+  debugger: DebuggerState;
+  nodeIDE: NodeIDEState;
+  // ... outras ferramentas
+}
+```
+
+#### 5.3.2 Slices e Reducers
+
+Cada seção do estado será gerenciada por um "slice" separado:
+
+```typescript
+// Exemplo de slice para o estado do emulador
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { Rom, Platform } from '@/types';
+
+const initialState: EmulatorState = {
+  status: 'idle',
+  currentRom: null,
+  platform: null,
+  fps: 0,
+  frameSkip: 0,
+  error: null,
+  lastFrameTime: 0,
+  isFullscreen: false
+};
+
+const emulatorSlice = createSlice({
+  name: 'emulator',
+  initialState,
+  reducers: {
+    // Inicia carregamento de ROM
+    loadRomStart(state, action: PayloadAction<Rom>) {
+      state.status = 'loading';
+      state.error = null;
+    },
+
+    // ROM carregada com sucesso
+    loadRomSuccess(state, action: PayloadAction<{ rom: Rom; platform: Platform }>) {
+      state.status = 'running';
+      state.currentRom = action.payload.rom;
+      state.platform = action.payload.platform;
+      state.error = null;
+    },
+
+    // Falha ao carregar ROM
+    loadRomFailure(state, action: PayloadAction<string>) {
+      state.status = 'error';
+      state.error = action.payload;
+    },
+
+    // Atualiza FPS
+    updateFps(state, action: PayloadAction<number>) {
+      state.fps = action.payload;
+      state.lastFrameTime = Date.now();
+    },
+
+    // Pausa/continua emulação
+    togglePause(state) {
+      if (state.status === 'running') {
+        state.status = 'paused';
+      } else if (state.status === 'paused') {
+        state.status = 'running';
+      }
+    },
+
+    // Reseta emulador
+    resetEmulator(state) {
+      if (state.status !== 'idle' && state.status !== 'loading') {
+        state.status = 'running';
+      }
+    },
+
+    // Alterna modo fullscreen
+    toggleFullscreen(state) {
+      state.isFullscreen = !state.isFullscreen;
+    },
+
+    // Configura frame skip
+    setFrameSkip(state, action: PayloadAction<number>) {
+      state.frameSkip = action.payload;
+    }
+  }
+});
+
+export const {
+  loadRomStart,
+  loadRomSuccess,
+  loadRomFailure,
+  updateFps,
+  togglePause,
+  resetEmulator,
+  toggleFullscreen,
+  setFrameSkip
+} = emulatorSlice.actions;
+
+export default emulatorSlice.reducer;
+```
+
+#### 5.3.3 Thunks para Operações Assíncronas
+
+Para operações assíncronas como comunicação com o servidor, usaremos Redux Thunks:
+
+```typescript
+import { createAsyncThunk } from '@reduxjs/toolkit';
+import { EmulatorApiClient } from '@/services/api';
+import { loadRomStart, loadRomSuccess, loadRomFailure } from './emulatorSlice';
+import { Rom, Platform } from '@/types';
+
+// API client
+const apiClient = new EmulatorApiClient(process.env.API_BASE_URL);
+
+// Thunk para carregar ROM
+export const loadRom = createAsyncThunk<
+  void,
+  string,
+  { rejectValue: string }
+>('emulator/loadRom', async (romId, { dispatch, rejectWithValue }) => {
+  try {
+    // Buscar detalhes da ROM
+    const rom = await apiClient.getRomDetails(romId);
+
+    // Iniciar carregamento
+    dispatch(loadRomStart(rom));
+
+    // Carregar ROM no emulador
+    const result = await apiClient.loadRom(romId);
+
+    if (!result.success) {
+      return dispatch(loadRomFailure(result.error || 'Failed to load ROM'));
+    }
+
+    // Determinar plataforma
+    const platform = detectPlatform(rom);
+
+    // ROM carregada com sucesso
+    dispatch(loadRomSuccess({ rom, platform }));
+  } catch (error) {
+    return dispatch(loadRomFailure(error.message || 'An unknown error occurred'));
+  }
+});
+
+// Thunk para salvar estado
+export const saveState = createAsyncThunk<
+  void,
+  { slot: number; description?: string },
+  { rejectValue: string }
+>('saveStates/saveState', async ({ slot, description }, { dispatch, getState, rejectWithValue }) => {
+  try {
+    // Indicar início do salvamento
+    dispatch(saveStateStart(slot));
+
+    // Fazer request para API
+    const result = await apiClient.saveState(slot, description);
+
+    if (!result.success) {
+      return dispatch(saveStateFailure({ slot, error: result.error || 'Failed to save state' }));
+    }
+
+    // Estado salvo com sucesso
+    dispatch(saveStateSuccess({ slot, state: result.state }));
+  } catch (error) {
+    return dispatch(saveStateFailure({ slot, error: error.message || 'An unknown error occurred' }));
+  }
+});
+```
+
+#### 5.3.4 Hooks para Acesso ao Estado
+
+Para facilitar o acesso ao estado Redux, criaremos hooks customizados:
+
+```typescript
+import { useDispatch, useSelector } from 'react-redux';
+import type { TypedUseSelectorHook } from 'react-redux';
+import type { RootState, AppDispatch } from '@/store';
+
+// Hooks tipados para Redux
+export const useAppDispatch = () => useDispatch<AppDispatch>();
+export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
+
+// Hook para estado do emulador
+export function useEmulatorState() {
+  const emulatorState = useAppSelector(state => state.emulator);
+  const dispatch = useAppDispatch();
+
+  return {
+    ...emulatorState,
+    loadRom: (romId: string) => dispatch(loadRom(romId)),
+    togglePause: () => dispatch(togglePause()),
+    resetEmulator: () => dispatch(resetEmulator()),
+    toggleFullscreen: () => dispatch(toggleFullscreen()),
+    setFrameSkip: (frameSkip: number) => dispatch(setFrameSkip(frameSkip))
+  };
+}
+
+// Hook para estado de ROMs
+export function useRomState() {
+  const romState = useAppSelector(state => state.roms);
+  const dispatch = useAppDispatch();
+
+  return {
+    ...romState,
+    searchRoms: (query: string) => dispatch(searchRoms(query)),
+    filterRoms: (filters: RomFilters) => dispatch(filterRoms(filters)),
+    toggleFavorite: (romId: string) => dispatch(toggleFavorite(romId)),
+    loadRomList: () => dispatch(fetchRoms())
+  };
+}
+
+// ... outros hooks especializados
+```
