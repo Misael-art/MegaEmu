@@ -243,3 +243,11 @@ frontend/build/
 frontend/dist/
 tests/build/
 tests/temp/
+
+# Arquivos de chaves e configuração
+*.keys.json
+gcp-oauth.keys.json
+config.json
+
+# Arquivos de workspace específicos
+*.code-workspace
