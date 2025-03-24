@@ -1,50 +1,108 @@
-name: Mega_Emu CI
+name: CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
+
+env:
+  BUILD_TYPE: Release
 
 jobs:
   build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.1
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v10
+      with:
+        vcpkgGitCommitId: 'master'
+
+    - name: Install dependencies
+      run: |
+        vcpkg install sdl2:x64-windows
+        vcpkg install qt5-base:x64-windows
+        vcpkg install opengl:x64-windows
+        vcpkg install glew:x64-windows
+        vcpkg install zlib:x64-windows
+        vcpkg install libpng:x64-windows
+        vcpkg install libjpeg-turbo:x64-windows
+        vcpkg install freetype:x64-windows
+
+    - name: Configure CMake
+      run: |
+        cmake -B ${{github.workspace}}/build `
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} `
+          -DCMAKE_TOOLCHAIN_FILE=${{env.VCPKG_ROOT}}/scripts/buildsystems/vcpkg.cmake
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build
+      run: ctest -C ${{env.BUILD_TYPE}} --output-on-failure
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        $version = $env:GITHUB_REF -replace 'refs/tags/v', ''
+        ./scripts/build/create_release.ps1 -Version $version -NoPrompt
+
+    - name: Upload Release Asset
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: actions/upload-artifact@v3
+      with:
+        name: mega-emu-${{ github.ref_name }}
+        path: build/released/mega-emu-*.zip
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Download Release Asset
+      uses: actions/download-artifact@v3
+      with:
+        name: mega-emu-${{ github.ref_name }}
 
-    - name: Instalar dependências
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: mega-emu-*.zip
+        draft: false
+        prerelease: contains(github.ref, '-')
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docs:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Doxygen
+      run: sudo apt-get install -y doxygen graphviz
+
+    - name: Generate Documentation
       run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential cmake libsdl2-dev
+        ./scripts/build/generate_docs.ps1 -NoPrompt
 
-    - name: Verificar tipos e consistência
-      run: |
-        chmod +x scripts/verify_types.sh
-        scripts/verify_types.sh
-
-    - name: Verificar estilo de código
-      run: |
-        chmod +x scripts/check_code_style.py
-        python3 scripts/check_code_style.py
-
-    - name: Criar diretório de build
-      run: mkdir -p build
-
-    - name: Configurar CMake
-      working-directory: build
-      run: cmake ..
-
-    - name: Compilar
-      working-directory: build
-      run: cmake --build .
-
-    - name: Executar testes
-      working-directory: build/bin
-      run: |
-        if [ -f unit_tests ]; then
-          ./unit_tests
-        else
-          echo "Unit tests not built"
-          exit 1
-        fi
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs/generated/html
+        force_orphan: true

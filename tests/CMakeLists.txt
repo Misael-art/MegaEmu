@@ -3,78 +3,192 @@ cmake_minimum_required(VERSION 3.10)
 # Adiciona o framework de testes Unity
 add_library(unity STATIC
     unity/unity.c
-    unity/unity.h
-    unity/unity_internals.h
 )
 
-# Configura os testes do M68K
-add_executable(m68k_test
-    cpu/m68k_test.c
+target_include_directories(unity PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/unity
 )
 
-target_link_libraries(m68k_test
-    PRIVATE
-        unity
-        m68k
-        memory
+# Configuração de testes para o Mega_Emu
+message(STATUS "Configurando testes do Mega_Emu...")
+
+# Configurar testes
+enable_testing()
+
+# Encontrar Unity
+find_package(Unity REQUIRED)
+
+# Função para adicionar teste
+function(add_unit_test test_name)
+    add_executable(${test_name} ${test_name}.c)
+    target_link_libraries(${test_name} PRIVATE Unity::Unity)
+    add_test(NAME ${test_name} COMMAND ${test_name})
+endfunction()
+
+# Adicionar subdiretórios de testes
+add_subdirectory(platforms/nes)
+add_subdirectory(platforms/megadrive)
+add_subdirectory(platforms/mastersystem)
+add_subdirectory(frontend/gui)
+add_subdirectory(frontend/sdl)
+if(BUILD_FRONTEND_QT)
+    add_subdirectory(frontend/qt)
+endif()
+add_subdirectory(tools)
+
+# Configurar cobertura de código
+if(CMAKE_COMPILER_IS_GNUCXX)
+    include(CodeCoverage)
+    append_coverage_compiler_flags()
+    setup_target_for_coverage_lcov(
+        NAME coverage
+        EXECUTABLE ctest
+        DEPENDENCIES ${TEST_TARGETS}
+    )
+endif()
+
+# Configurar relatório de testes
+add_custom_target(test_report
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes e gerando relatório"
 )
 
-# Configura os testes do Z80
-add_executable(z80_test
-    cpu/z80_test.c
+# Configurar testes de memória com Valgrind
+find_program(VALGRIND "valgrind")
+if(VALGRIND)
+    add_custom_target(memcheck
+        COMMAND ${VALGRIND} --leak-check=full --error-exitcode=1 ${CMAKE_CTEST_COMMAND}
+        DEPENDS ${TEST_TARGETS}
+        COMMENT "Executando testes com Valgrind"
+    )
+endif()
+
+# Configurar testes de sanitizer
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_custom_target(sanitize
+        COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug
+                                -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"
+                                -DCMAKE_C_FLAGS="-fsanitize=address,undefined"
+                                ${CMAKE_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} --build .
+        COMMAND ${CMAKE_CTEST_COMMAND}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Executando testes com sanitizers"
+    )
+endif()
+
+# Configurar testes de fuzz
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_custom_target(fuzz
+        COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug
+                                -DCMAKE_CXX_FLAGS="-fsanitize=fuzzer,address"
+                                -DCMAKE_C_FLAGS="-fsanitize=fuzzer,address"
+                                ${CMAKE_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} --build .
+        COMMAND ${CMAKE_CTEST_COMMAND}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Executando testes de fuzzing"
+    )
+endif()
+
+# Configurar testes de benchmark
+add_custom_target(benchmark
+    COMMAND ${CMAKE_CTEST_COMMAND} -L benchmark
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de benchmark"
 )
 
-target_link_libraries(z80_test
-    PRIVATE
-        unity
-        z80
-        memory
+# Configurar testes de integração
+add_custom_target(integration
+    COMMAND ${CMAKE_CTEST_COMMAND} -L integration
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de integração"
 )
 
-# Configura os testes do Mega Drive
-add_executable(mega_drive_test
-    mega_drive/mega_drive_test.c
+# Configurar testes de sistema
+add_custom_target(system
+    COMMAND ${CMAKE_CTEST_COMMAND} -L system
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de sistema"
 )
 
-target_link_libraries(mega_drive_test
-    PRIVATE
-        unity
-        mega_drive
-        m68k
-        z80
-        memory
+# Configurar testes de regressão
+add_custom_target(regression
+    COMMAND ${CMAKE_CTEST_COMMAND} -L regression
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de regressão"
 )
 
-# Configura os testes do Master System
-add_executable(master_system_test
-    master_system/master_system_test.c
+# Configurar testes de performance
+add_custom_target(performance
+    COMMAND ${CMAKE_CTEST_COMMAND} -L performance
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de performance"
 )
 
-target_link_libraries(master_system_test
-    PRIVATE
-        unity
-        master_system
-        z80
-        memory
+# Configurar testes de stress
+add_custom_target(stress
+    COMMAND ${CMAKE_CTEST_COMMAND} -L stress
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de stress"
 )
 
-# Adiciona os testes como testes do CTest
-add_test(NAME m68k_test COMMAND m68k_test)
-add_test(NAME z80_test COMMAND z80_test)
-add_test(NAME mega_drive_test COMMAND mega_drive_test)
-add_test(NAME master_system_test COMMAND master_system_test)
+# Configurar testes de carga
+add_custom_target(load
+    COMMAND ${CMAKE_CTEST_COMMAND} -L load
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de carga"
+)
 
-# Adiciona testes de CPU
-add_subdirectory(cpu)
+# Configurar testes de compatibilidade
+add_custom_target(compatibility
+    COMMAND ${CMAKE_CTEST_COMMAND} -L compatibility
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de compatibilidade"
+)
 
-# Adiciona testes de memória
-add_subdirectory(memory)
+# Configurar testes de segurança
+add_custom_target(security
+    COMMAND ${CMAKE_CTEST_COMMAND} -L security
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de segurança"
+)
 
-# Adiciona testes de vídeo
-add_subdirectory(video)
+# Configurar testes de usabilidade
+add_custom_target(usability
+    COMMAND ${CMAKE_CTEST_COMMAND} -L usability
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de usabilidade"
+)
 
-# Adiciona testes de áudio
-add_subdirectory(audio)
+# Configurar testes de acessibilidade
+add_custom_target(accessibility
+    COMMAND ${CMAKE_CTEST_COMMAND} -L accessibility
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de acessibilidade"
+)
 
-# Adiciona testes de save state
-add_subdirectory(save_state)
+# Configurar testes de localização
+add_custom_target(localization
+    COMMAND ${CMAKE_CTEST_COMMAND} -L localization
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de localização"
+)
+
+# Configurar testes de instalação
+add_custom_target(installation
+    COMMAND ${CMAKE_CTEST_COMMAND} -L installation
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de instalação"
+)
+
+# Configurar testes de documentação
+add_custom_target(documentation
+    COMMAND ${CMAKE_CTEST_COMMAND} -L documentation
+    DEPENDS ${TEST_TARGETS}
+    COMMENT "Executando testes de documentação"
+)
+
+message(STATUS "Configuração de testes concluída")
+message(STATUS "Execute 'ctest' para rodar todos os testes")

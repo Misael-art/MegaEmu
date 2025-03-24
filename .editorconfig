@@ -1,0 +1,77 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+
+# C/C++ files
+[*.{c,h,cpp,hpp}]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+# CMake files
+[{CMakeLists.txt,*.cmake}]
+indent_style = space
+indent_size = 2
+
+# PowerShell files
+[*.{ps1,psm1,psd1}]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+# Markdown files
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = 80
+
+# YAML files
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# JSON files
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Python files
+[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 88
+
+# Shell scripts
+[*.sh]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+# Windows batch files
+[*.{cmd,bat}]
+end_of_line = crlf
+
+# Documentation files
+[docs/**]
+max_line_length = 80
+
+# Test files
+[tests/**]
+indent_style = space
+indent_size = 4
+
+# Third party files
+[third_party/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset

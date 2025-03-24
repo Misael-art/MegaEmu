@@ -710,6 +710,51 @@ Este padrão de design permite:
 - Adicionar novas plataformas reaproveitando componentes existentes
 - Testar componentes isoladamente
 
+## Game Gear
+
+O Game Gear compartilha muitos componentes com o Master System, mas possui algumas diferenças importantes:
+
+**Diferenças:**
+
+*   **Resolução da tela:** Game Gear tem uma resolução menor (160x144) do que o Master System (256x192).
+*   **Paleta de cores:** Game Gear tem uma paleta de 4096 cores, enquanto o Master System tem 64.
+*   **Áudio:** Game Gear tem saída estéreo, enquanto o Master System é mono.
+*   **Entrada:** Game Gear tem um layout de controle e botões diferentes.
+*   **BIOS:** Game Gear possui uma BIOS embutida.
+
+**Componentes:**
+
+*   **Processador:** Zilog Z80 (8-bit, 3.58MHz) - Reutilizado do Master System.
+*   **Memória:** Similar ao Master System, mas com algumas diferenças no mapa de memória.
+*   **Vídeo:** VDP adaptado do Master System para lidar com a resolução e paleta de cores do Game Gear.
+*   **Áudio:** PSG SN76489 adaptado do Master System para saída estéreo.
+*   **Entrada:** Novo manipulador de entrada para gerenciar as entradas específicas do controle do Game Gear.
+
+**Diagrama:**
+
+```
++----------------+
+|      Z80       |
+| (Main CPU)     |
++----------------+
+        |
+        v
++----------------+
+|    Memory      |
++----------------+
+     /     \
+    /       \
+   v         v
++------+  +------+
+| VDP  |  | PSG  |
++------+  +------+
+   |       |
+   v       v
++------+  +------+
+|Stereo|  |Input |
++------+  +------+
+```
+
 ## Conclusão
 
 A arquitetura do Mega_Emu é projetada para ser modular e extensível, permitindo a adição de novas plataformas com esforço mínimo. O compartilhamento de hardware comum entre plataformas, como CPUs, chips de áudio e vídeo, reduz a duplicação de código e facilita a manutenção.

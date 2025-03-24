@@ -752,3 +752,321 @@ Para garantir que a migração seja bem-sucedida, as seguintes métricas serão 
 - Redux Toolkit para estado global: <https://redux-toolkit.js.org>
 - Storybook para documentação de componentes: <https://storybook.js.org>
 - React Testing Library: <https://testing-library.com/docs/react-testing-library/intro>
+
+# Guia de Build do Mega_Emu
+
+## Estrutura de Diretórios
+
+O projeto utiliza a seguinte estrutura de diretórios para builds:
+
+```
+/build/
+  ├── test/           # Builds de testes
+  ├── temp/           # Arquivos temporários
+  ├── emulators/      # Builds dos emuladores
+  │   ├── nes/
+  │   ├── megadrive/
+  │   └── mastersystem/
+  ├── frontend/       # Builds dos frontends
+  │   ├── sdl/
+  │   └── qt/
+  ├── Mega_tools/     # Builds das ferramentas
+  └── released/       # Builds para release
+      └── [versão]/
+```
+
+## Scripts de Build
+
+Os scripts de build estão localizados em `/scripts/build/` e são organizados da seguinte forma:
+
+- `build_all.ps1`: Compila todos os componentes
+- `build_nes.ps1`: Compila apenas o emulador NES
+- `build_megadrive.ps1`: Compila apenas o emulador Mega Drive
+- `build_frontend_sdl.ps1`: Compila apenas o frontend SDL
+- `build_tools.ps1`: Compila apenas as ferramentas Mega_tools
+
+### Uso dos Scripts
+
+Cada script aceita os seguintes parâmetros:
+
+```powershell
+.\build_[componente].ps1 [-BuildType <Release|Debug>] [-Clean] [-Rebuild]
+```
+
+Exemplos:
+
+```powershell
+# Build completo em modo Release
+.\build_all.ps1
+
+# Build do NES em modo Debug
+.\build_nes.ps1 -BuildType Debug
+
+# Rebuild limpo do frontend SDL
+.\build_frontend_sdl.ps1 -Rebuild
+```
+
+## Regras de Build
+
+1. **Modularidade**: Cada componente pode ser compilado independentemente
+2. **Consistência**: Todos os scripts usam as mesmas funções utilitárias de `/scripts/common/`
+3. **Isolamento**: Cada build é feito em seu próprio diretório
+4. **Limpeza**: Use `-Clean` para remover builds anteriores
+5. **Dependências**: Gerenciadas automaticamente via vcpkg
+
+## Dependências
+
+O sistema gerencia automaticamente:
+
+- Visual Studio Build Tools
+- CMake
+- Ninja
+- vcpkg
+- SDL2 (quando necessário)
+- Qt (quando necessário)
+
+## Estrutura do CMake
+
+O projeto usa uma estrutura modular de CMake:
+
+1. **Root CMakeLists.txt**: Configuração global e opções de build
+2. **src/CMakeLists.txt**: Configuração dos componentes principais
+3. **CMakeLists.txt** específicos para cada componente
+
+### Opções de Build
+
+```cmake
+option(BUILD_TESTS "Build tests" OFF)
+option(USE_SDL2 "Use SDL2 for graphics and audio" ON)
+option(BUILD_NES "Build NES emulation" ON)
+option(BUILD_MEGADRIVE "Build Mega Drive emulation" ON)
+option(BUILD_MASTERSYSTEM "Build Master System emulation" ON)
+option(BUILD_FRONTEND_SDL "Build SDL2 frontend" ON)
+option(BUILD_FRONTEND_QT "Build Qt frontend" OFF)
+option(BUILD_TOOLS "Build Mega_tools" ON)
+```
+
+## Verificações de Build
+
+O sistema inclui verificações para:
+
+1. Ambiente de compilação correto
+2. Dependências instaladas
+3. Configuração do vcpkg
+4. Integridade dos arquivos gerados
+
+## Fluxo de Build Recomendado
+
+1. **Desenvolvimento**:
+   - Use builds individuais dos componentes
+   - Mantenha o modo Debug
+   - Use o diretório `build/temp` para testes
+
+2. **Testes**:
+   - Compile com `-DBUILD_TESTS=ON`
+   - Use o diretório `build/test`
+   - Execute a suíte de testes completa
+
+3. **Release**:
+   - Use `build_all.ps1` em modo Release
+   - Verifique a integridade dos binários
+   - Gere a documentação
+   - Crie o pacote de distribuição
+
+## Boas Práticas
+
+1. **Sempre use os scripts fornecidos** em vez de comandos CMake diretos
+2. **Mantenha os diretórios de build limpos** usando `-Clean` periodicamente
+3. **Documente mudanças** nas dependências ou no processo de build
+4. **Teste em modo Debug** antes de fazer builds de Release
+5. **Use o sistema de versionamento** adequadamente
+
+## Troubleshooting
+
+1. **Build falha com erro de dependência**:
+   - Verifique se vcpkg está atualizado
+   - Execute o script com `-Clean`
+
+2. **Conflitos de versão**:
+   - Limpe o cache do CMake
+   - Verifique o arquivo de lock do vcpkg
+
+3. **Erros de compilação**:
+   - Verifique logs em `build/temp`
+   - Use modo Debug para mais informações
+
+## Notas Adicionais
+
+- Os scripts são idempotentes e podem ser executados múltiplas vezes
+- O sistema mantém logs detalhados em `build/temp`
+- Use `build/released` apenas para builds finais
+- Mantenha o vcpkg atualizado para evitar problemas de dependência
+
+## Diretrizes de Compilação para IA
+
+### Estrutura de Build
+
+1. **Hierarquia de Diretórios**
+
+   ```
+   /build/
+     ├── test/           # Builds de testes
+     ├── temp/           # Arquivos temporários
+     ├── emulators/      # Builds dos emuladores
+     │   ├── nes/
+     │   ├── megadrive/
+     │   └── mastersystem/
+     ├── frontend/       # Builds dos frontends
+     │   ├── sdl/
+     │   └── qt/
+     ├── Mega_tools/     # Builds das ferramentas
+     └── released/       # Builds para release
+         └── [versão]/
+   ```
+
+2. **Scripts de Build**
+   - `build_all.ps1`: Compila todos os componentes
+   - `build_nes.ps1`: Compila apenas o emulador NES
+   - `build_megadrive.ps1`: Compila apenas o emulador Mega Drive
+   - `build_frontend_sdl.ps1`: Compila apenas o frontend SDL
+   - `build_tools.ps1`: Compila apenas as ferramentas Mega_tools
+
+### Padrões de Compilação
+
+1. **Parâmetros de Build**
+
+   ```powershell
+   # Formato padrão
+   .\build_[componente].ps1 [-BuildType <Release|Debug>] [-Clean] [-Rebuild]
+   ```
+
+2. **Opções de CMake**
+
+   ```cmake
+   # Opções padrão para cada componente
+   option(BUILD_TESTS "Build tests" OFF)
+   option(USE_SDL2 "Use SDL2 for graphics and audio" ON)
+   option(BUILD_NES "Build NES emulation" ON)
+   option(BUILD_MEGADRIVE "Build Mega Drive emulation" ON)
+   option(BUILD_MASTERSYSTEM "Build Master System emulation" ON)
+   option(BUILD_FRONTEND_SDL "Build SDL2 frontend" ON)
+   option(BUILD_FRONTEND_QT "Build Qt frontend" OFF)
+   option(BUILD_TOOLS "Build Mega_tools" ON)
+   ```
+
+3. **Flags de Compilação**
+
+   ```cmake
+   # Windows (MSVC)
+   add_compile_options(/W4 /WX)
+
+   # Unix (GCC/Clang)
+   add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+   ```
+
+### Regras para IA
+
+1. **Verificações Obrigatórias**
+   - Validar existência de dependências
+   - Verificar estrutura de diretórios
+   - Confirmar configuração do vcpkg
+   - Checar integridade dos arquivos gerados
+
+2. **Sequência de Build**
+
+   ```powershell
+   # Sequência padrão
+   .\scripts\build\check_environment.ps1
+   .\scripts\build\setup_vcpkg.ps1
+   .\scripts\build\create_build_structure.ps1
+   .\scripts\build\build_all.ps1
+   .\scripts\build\verify_binaries.ps1
+   ```
+
+3. **Tratamento de Erros**
+   - Documentar erros comuns e soluções
+   - Fornecer mensagens claras de erro
+   - Implementar recuperação de falhas
+   - Manter logs detalhados
+
+4. **Validação de Resultados**
+
+   ```powershell
+   # Verificações pós-build
+   .\scripts\build\run_tests.ps1
+   .\scripts\build\verify_binaries.ps1
+   ```
+
+### Diretrizes para Testes
+
+1. **Estrutura de Testes**
+
+   ```cmake
+   # Configuração padrão de testes
+   enable_testing()
+   add_subdirectory(tests)
+   ```
+
+2. **Categorias de Teste**
+   - Unitários: Componentes individuais
+   - Integração: Interação entre componentes
+   - Performance: Métricas de desempenho
+   - Regressão: Verificação de bugs corrigidos
+   - Benchmark: Testes de performance detalhados
+
+3. **Execução de Testes**
+
+   ```powershell
+   # Execução padrão
+   .\scripts\build\run_tests.ps1 [-Verbose] [-FailFast] [-Filter "*"]
+   ```
+
+### Manutenção e Documentação
+
+1. **Atualização de Versão**
+
+   ```powershell
+   # Processo de atualização
+   .\scripts\build\update_version.ps1 -Version "x.y.z"
+   .\scripts\build\update_changelog.ps1 -Version "x.y.z" -Type "Added"
+   ```
+
+2. **Geração de Documentação**
+
+   ```powershell
+   # Gerar documentação
+   .\scripts\build\generate_docs.ps1 [-Force] [-IncludePrivate]
+   ```
+
+3. **Criação de Release**
+
+   ```powershell
+   # Processo de release
+   .\scripts\build\create_release.ps1 -Version "x.y.z"
+   ```
+
+### Integração Contínua
+
+1. **GitHub Actions**
+
+   ```yaml
+   # Workflow padrão
+   name: CI/CD
+   on: [push, pull_request]
+   jobs:
+     build:
+       runs-on: windows-latest
+       steps:
+         - uses: actions/checkout@v3
+         - name: Build
+           run: .\scripts\build\build_all.ps1
+         - name: Test
+           run: .\scripts\build\run_tests.ps1
+   ```
+
+2. **Verificações Automáticas**
+   - Lint do código
+   - Testes unitários
+   - Testes de integração
+   - Verificação de cobertura
+   - Análise estática

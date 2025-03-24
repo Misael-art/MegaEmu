@@ -1,1 +1,48 @@
-# CMakeLists.txt para o componente de cartuchos do NES# Definir arquivos fonte Cset(NES_CARTRIDGE_C_SOURCES    nes_cartridge.c    mapper5.c)# Definir arquivos fonte C++set(NES_CARTRIDGE_CPP_SOURCES    nes_cartridge.cpp)# Definir arquivos de cabeçalhoset(NES_CARTRIDGE_HEADERS    nes_cartridge.h    nes_cartridge.hpp)# Adicionar arquivos à biblioteca mega_emu_nestarget_sources(mega_emu_nes    PRIVATE        ${NES_CARTRIDGE_C_SOURCES}        ${NES_CARTRIDGE_CPP_SOURCES}    PUBLIC        ${NES_CARTRIDGE_HEADERS})# Adicionar diretório atual como include pathtarget_include_directories(mega_emu_nes    PUBLIC        ${CMAKE_CURRENT_SOURCE_DIR})# Definir flags específicas para compilação C++set_source_files_properties(    ${NES_CARTRIDGE_CPP_SOURCES}    PROPERTIES    COMPILE_FLAGS "${CXX_STANDARD_FLAGS}")# Adicionar os arquivos C originaisset(CART_C_SOURCES    nes_cartridge.c    mapper5.c)set(CART_C_HEADERS    nes_cartridge.h)# Adicionar os arquivos C++set(CART_SOURCES    nes_cartridge.cpp    mappers/mapper0.cpp    mappers/mapper1.cpp)set(CART_HEADERS    nes_cartridge.hpp    mappers/mapper0.hpp    mappers/mapper1.hpp)# Criar biblioteca do cartridgeadd_library(nes_cartridge STATIC    ${CART_SOURCES}    ${CART_C_SOURCES}    ${CART_HEADERS}    ${CART_C_HEADERS})# Definir includestarget_include_directories(nes_cartridge PUBLIC    ${CMAKE_CURRENT_SOURCE_DIR}    ${CMAKE_SOURCE_DIR}/src    ${CMAKE_SOURCE_DIR}/src/platforms/nes)# Definir flags de compilaçãotarget_compile_features(nes_cartridge PRIVATE cxx_std_17)# Linkar com outras bibliotecastarget_link_libraries(nes_cartridge    nes_ppu    utils)# Exportar bibliotecaset(NES_CARTRIDGE_LIBRARY nes_cartridge PARENT_SCOPE)set(NES_CARTRIDGE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR} PARENT_SCOPE)
+# CMakeLists.txt para o componente de cartuchos do NES
+
+# Definir arquivos fonte C
+set(NES_CARTRIDGE_SOURCES
+    nes_cartridge.c
+    mappers/mapper0.c
+    mappers/mapper1.c
+    mappers/mapper2.c
+    mappers/mapper3.c
+    mappers/mapper4.c
+    mappers/mapper5.c
+    mappers/mapper6.c
+    mappers/mapper7.c
+    mappers/mapper8.c
+    mappers/mapper9.c
+    mappers/mapper71.c
+    mappers/mapper90.c
+    mappers/mapper230.c
+    mappers/mapper255.c
+)
+
+# Definir arquivos de cabeçalho
+set(NES_CARTRIDGE_HEADERS
+    nes_cartridge.h
+)
+
+# Criar biblioteca do cartridge
+add_library(nes_cartridge STATIC
+    ${NES_CARTRIDGE_SOURCES}
+    ${NES_CARTRIDGE_HEADERS}
+)
+
+# Definir includes
+target_include_directories(nes_cartridge PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/platforms/nes
+)
+
+# Linkar com outras bibliotecas
+target_link_libraries(nes_cartridge
+    nes_ppu
+    utils
+)
+
+# Exportar biblioteca
+set(NES_CARTRIDGE_LIBRARY nes_cartridge PARENT_SCOPE)
+set(NES_CARTRIDGE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR} PARENT_SCOPE)

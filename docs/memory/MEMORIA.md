@@ -10,15 +10,15 @@ O sistema de memória do Mega_Emu foi projetado para ser flexível, eficiente e 
 
 ### Componentes Principais
 
-1. **Gerenciador de Memória**: Coordena todas as operações de memória e mantém o mapa de memória.
-2. **Regiões de Memória**: Blocos contíguos de memória com propriedades específicas.
-3. **Callbacks de Acesso**: Funções chamadas quando ocorrem leituras ou escritas em regiões específicas.
-4. **Bancos de Memória**: Mecanismo para alternar entre diferentes mapeamentos de memória.
-5. **Cache de Acesso**: Otimiza operações repetidas na mesma região de memória.
+1.  **Gerenciador de Memória**: Coordena todas as operações de memória e mantém o mapa de memória.
+2.  **Regiões de Memória**: Blocos contíguos de memória com propriedades específicas.
+3.  **Callbacks de Acesso**: Funções chamadas quando ocorrem leituras ou escritas em regiões específicas.
+4.  **Bancos de Memória**: Mecanismo para alternar entre diferentes mapeamentos de memória.
+5.  **Cache de Acesso**: Otimiza operações repetidas na mesma região de memória.
 
 ### Diagrama de Componentes
 
-```
+\`\`\`
 ┌─────────────────────────────────────────────────────┐
 │                  Processador Emulado                │
 └───────────────────────┬─────────────────────────────┘
@@ -37,13 +37,13 @@ O sistema de memória do Mega_Emu foi projetado para ser flexível, eficiente e 
 │  │  de Acesso  │    │  de Acesso  │    │ de Acesso│ │
 │  └─────────────┘    └─────────────┘    └──────────┘ │
 └─────────────────────────────────────────────────────┘
-```
+\`\`\`
 
 ## Implementação
 
 ### Estruturas de Dados
 
-```c
+\`\`\`c
 // Definição de uma região de memória
 typedef struct {
     uint32_t start_address;    // Endereço inicial
@@ -66,11 +66,11 @@ typedef struct {
     memory_region_t *last_read_region;       // Cache para otimização
     memory_region_t *last_write_region;      // Cache para otimização
 } memory_system_t;
-```
+\`\`\`
 
 ### Funções Principais
 
-```c
+\`\`\`c
 // Cria um novo sistema de memória
 memory_system_t* memory_create(uint32_t max_regions);
 
@@ -100,7 +100,7 @@ uint32_t memory_read_32(memory_system_t *memory, uint32_t address);
 void memory_write_8(memory_system_t *memory, uint32_t address, uint8_t value);
 void memory_write_16(memory_system_t *memory, uint32_t address, uint16_t value);
 void memory_write_32(memory_system_t *memory, uint32_t address, uint32_t value);
-```
+\`\`\`
 
 ## Características Avançadas
 
@@ -108,7 +108,7 @@ void memory_write_32(memory_system_t *memory, uint32_t address, uint32_t value);
 
 O sistema de memória suporta banking (troca de bancos de memória), uma técnica comum em consoles antigos para superar limitações de espaço de endereçamento.
 
-```c
+\`\`\`c
 // Define um banco de memória
 typedef struct {
     uint32_t bank_address;     // Endereço base do banco
@@ -123,13 +123,13 @@ memory_bank_t* memory_bank_create(uint32_t bank_address, uint32_t bank_size, uin
 void memory_bank_destroy(memory_bank_t *bank);
 void memory_bank_set_data(memory_bank_t *bank, uint32_t bank_index, uint8_t *data);
 void memory_bank_select(memory_bank_t *bank, uint32_t bank_index);
-```
+\`\`\`
 
 ### Espelhamento de Memória
 
 O espelhamento de memória é implementado através de callbacks especiais:
 
-```c
+\`\`\`c
 // Callback para espelhamento de memória
 uint8_t memory_mirror_read_callback(void *context, uint32_t address) {
     mirror_context_t *mirror = (mirror_context_t*)context;
@@ -142,22 +142,22 @@ void memory_mirror_write_callback(void *context, uint32_t address, uint8_t value
     uint32_t mirrored_address = (address & mirror->mask) + mirror->offset;
     memory_write_8(mirror->memory, mirrored_address, value);
 }
-```
+\`\`\`
 
 ### Proteção de Memória
 
 Pode-se configurar regiões de memória com diferentes níveis de proteção:
 
-- **READ_ONLY**: Apenas leitura, tentativas de escrita são ignoradas ou geram avisos
-- **WRITE_ONLY**: Apenas escrita, leituras retornam um valor padrão
-- **READ_WRITE**: Leitura e escrita permitidas
-- **NO_ACCESS**: Nem leitura nem escrita são permitidas
+*   **READ\_ONLY**: Apenas leitura, tentativas de escrita são ignoradas ou geram avisos
+*   **WRITE\_ONLY**: Apenas escrita, leituras retornam um valor padrão
+*   **READ\_WRITE**: Leitura e escrita permitidas
+*   **NO\_ACCESS**: Nem leitura nem escrita são permitidas
 
 ### Cache de Otimização
 
 Para melhorar o desempenho, o sistema mantém um cache das últimas regiões acessadas:
 
-```c
+\`\`\`c
 // Exemplo de otimização para leitura
 uint8_t memory_read_8(memory_system_t *memory, uint32_t address) {
     // Verificar se o endereço está na região cacheada anterior
@@ -178,7 +178,7 @@ uint8_t memory_read_8(memory_system_t *memory, uint32_t address) {
 
     // Continua com a leitura...
 }
-```
+\`\`\`
 
 ## Considerações de Design
 
@@ -186,7 +186,7 @@ uint8_t memory_read_8(memory_system_t *memory, uint32_t address) {
 
 O sistema de memória lida com sistemas de diferentes endianness:
 
-```c
+\`\`\`c
 // Configuração de endianness
 typedef enum {
     MEMORY_LITTLE_ENDIAN,
@@ -199,13 +199,13 @@ void memory_set_endianness(memory_system_t *memory, memory_endianness_t endianne
 // Funções internas para conversão de endianness
 uint16_t memory_convert_endian_16(memory_system_t *memory, uint16_t value);
 uint32_t memory_convert_endian_32(memory_system_t *memory, uint32_t value);
-```
+\`\`\`
 
 ### Alinhamento
 
 Algumas plataformas têm requisitos específicos de alinhamento:
 
-```c
+\`\`\`c
 // Configuração de requisitos de alinhamento
 typedef enum {
     MEMORY_ALIGN_NONE,       // Sem restrições de alinhamento
@@ -215,30 +215,30 @@ typedef enum {
 
 // Definir requisitos de alinhamento
 void memory_set_alignment(memory_system_t *memory, memory_alignment_t alignment);
-```
+\`\`\`
 
 ### Depuração
 
 O sistema inclui ferramentas de depuração para monitorar acessos à memória:
 
-```c
+\`\`\`c
 // Tipo de callback para monitoramento de memória
 typedef void (*memory_monitor_callback_t)(uint32_t address, uint8_t value,
                                           int is_write, void *context);
 
 // Adicionar monitoramento a uma região
-void memory_add_monitor(memory_system_t *memory, uint32_t start, uint32_t end,
+void memory_add_monitor(memory_system_t *memory, uint32_t address, uint32_t end,
                          memory_monitor_callback_t callback, void *context);
 
 // Remover monitoramento
 void memory_remove_monitor(memory_system_t *memory, uint32_t start, uint32_t end);
-```
+\`\`\`
 
 ## Exemplos de Uso
 
 ### Configuração Básica do Sistema de Memória
 
-```c
+\`\`\`c
 // Criar sistema de memória
 memory_system_t *memory = memory_create(16);  // Suporta até 16 regiões
 
@@ -257,11 +257,11 @@ memory_add_mapped_region(memory, 0xA00000, 0xA0FFFF,
 
 // Configurar comportamento para endereços não mapeados
 memory_set_default_callbacks(memory, unmapped_read, unmapped_write, NULL);
-```
+\`\`\`
 
 ### Implementação de um Mapper NES
 
-```c
+\`\`\`c
 // Callback para mapper
 uint8_t mapper1_read(void *context, uint32_t address) {
     mapper1_t *mapper = (mapper1_t*)context;
@@ -319,7 +319,7 @@ void mapper1_write(void *context, uint32_t address, uint8_t value) {
 
     // Outros casos...
 }
-```
+\`\`\`
 
 ## Plataformas Específicas
 
@@ -338,7 +338,7 @@ No Mega Drive, o mapeamento de memória é o seguinte:
 | 0xC00000 - 0xDFFFFF | 2MB     | Espaço para VDP               |
 | 0xE00000 - 0xFFFFFF | 2MB     | RAM (64KB espelhada)          |
 
-```c
+\`\`\`c
 // Configuração da memória do Mega Drive
 void setup_megadrive_memory(memory_system_t *memory, uint8_t *rom, size_t rom_size) {
     // ROM (até 4MB)
@@ -368,7 +368,7 @@ void setup_megadrive_memory(memory_system_t *memory, uint8_t *rom, size_t rom_si
                            MEMORY_ACCESS_READ | MEMORY_ACCESS_WRITE);
     }
 }
-```
+\`\`\`
 
 ### NES
 
@@ -385,7 +385,7 @@ No NES, o mapeamento de memória é o seguinte:
 | 0x6000 - 0x7FFF   | 8KB     | SRAM para save                      |
 | 0x8000 - 0xFFFF   | 32KB    | ROM do programa (PRG-ROM)           |
 
-```c
+\`\`\`c
 // Configuração da memória do NES
 void setup_nes_memory(memory_system_t *memory, nes_cartridge_t *cart) {
     // RAM interna (2KB)
@@ -431,7 +431,7 @@ void setup_nes_memory(memory_system_t *memory, nes_cartridge_t *cart) {
                              mapper_read_callback, mapper_write_callback,
                              cart->mapper, MEMORY_ACCESS_READ | MEMORY_ACCESS_WRITE);
 }
-```
+\`\`\`
 
 ## Considerações de Performance
 
@@ -439,7 +439,7 @@ void setup_nes_memory(memory_system_t *memory, nes_cartridge_t *cart) {
 
 Para regiões de acesso frequente, como RAM, o acesso direto aos dados é mais eficiente que o uso de callbacks. O sistema de memória é projetado para otimizar automaticamente:
 
-```c
+\`\`\`c
 uint8_t memory_read_8(memory_system_t *memory, uint32_t address) {
     memory_region_t *region = find_region(memory, address);
 
@@ -457,7 +457,7 @@ uint8_t memory_read_8(memory_system_t *memory, uint32_t address) {
 
     return 0xFF;
 }
-```
+\`\`\`
 
 ### Cache de Região
 
@@ -467,7 +467,7 @@ O sistema mantém um cache da última região acessada para leitura e para escri
 
 Para sistemas com espaço de endereçamento pequeno, como o NES, uma tabela de lookup pode ser mais eficiente:
 
-```c
+\`\`\`c
 // Tabela de lookup para acesso rápido
 void memory_build_lookup_table(memory_system_t *memory) {
     memory->read_table = malloc(65536 * sizeof(void*));
@@ -496,19 +496,19 @@ uint8_t memory_read_8_fast(memory_system_t *memory, uint16_t address) {
         return memory_read_8(memory, address);  // Fallback para método normal
     }
 }
-```
+\`\`\`
 
 ## Integração com Depuração
 
 O sistema de memória integra-se com as ferramentas de depuração do emulador para fornecer recursos como:
 
-1. **Logging de Acesso**: Rastreamento de leituras e escritas em regiões específicas
-2. **Breakpoints**: Interrupção da emulação quando ocorrem acessos a endereços específicos
-3. **Watchpoints**: Monitoramento de valores em endereços específicos
-4. **Memory Dump**: Exportação do conteúdo da memória para análise
-5. **Disassembly**: Decodificação de instruções da memória
+1.  **Logging de Acesso**: Rastreamento de leituras e escritas em regiões específicas
+2.  **Breakpoints**: Interrupção da emulação quando ocorrem acessos a endereços específicos
+3.  **Watchpoints**: Monitoramento de valores em endereços específicos
+4.  **Memory Dump**: Exportação do conteúdo da memória para análise
+5.  **Disassembly**: Decodificação de instruções da memória
 
-```c
+\`\`\`c
 // Exemplo de integração com depuração
 void memory_add_breakpoint(memory_system_t *memory, uint32_t address,
                             int break_on_read, int break_on_write) {
@@ -523,7 +523,7 @@ void memory_add_breakpoint(memory_system_t *memory, uint32_t address,
     // Adicionar monitor para acionar o breakpoint
     memory_add_monitor(memory, address, address, breakpoint_callback, bp);
 }
-```
+\`\`\`
 
 ## Conclusão
 
@@ -531,8 +531,57 @@ O sistema de memória do Mega_Emu fornece uma base sólida para a emulação de 
 
 Futuras melhorias planejadas incluem:
 
-1. Suporte a mapeamento baseado em páginas para sistemas complexos
-2. JIT caching para acessos frequentes
-3. Melhor integração com o sistema de savestates
-4. Ferramentas visuais para análise de utilização de memória
-5. Suporte para sistemas que manipulam memória virtual
+1.  Suporte a mapeamento baseado em páginas para sistemas complexos
+2.  JIT caching para acessos frequentes
+3.  Melhor integração com o sistema de savestates
+4.  Ferramentas visuais para análise de utilização de memória
+5.  Suporte para sistemas que manipulam memória virtual
+
+## Game Gear
+
+O Game Gear compartilha a mesma CPU Z80 do Master System, mas possui um mapa de memória ligeiramente diferente.
+
+**Mapa de Memória:**
+
+| Faixa de Endereço | Tamanho | Descrição                                     |
+|-------------------|---------|-----------------------------------------------|
+| 0x0000 - 0x3FFF   | 16KB    | ROM (Cartucho)                                |
+| 0x4000 - 0x7FFF   | 16KB    | ROM (Cartucho) - Banco selecionável           |
+| 0x8000 - 0xBFFF   | 16KB    | RAM                                           |
+| 0xC000 - 0xDFFF   | 8KB     | VRAM                                          |
+| 0xE000 - 0xFFFF   | 8KB     | Registradores de I/O, PSG, VDP, etc.          |
+
+**Diferenças em relação ao Master System:**
+
+*   O Game Gear possui uma BIOS embutida, que é mapeada em uma região de memória diferente do Master System.
+*   O Game Gear possui registradores de I/O e controle específicos para a tela LCD e outros periféricos.
+*   O Game Gear possui um sistema de som estéreo, o que requer registradores adicionais para controlar o áudio.
+
+**Considerações de Implementação:**
+
+*   Ao implementar o sistema de memória do Game Gear, é importante levar em consideração as diferenças em relação ao Master System.
+*   É necessário mapear corretamente os registradores de I/O, PSG e VDP para garantir que o emulador funcione corretamente.
+*   É importante implementar o suporte para a BIOS do Game Gear, para garantir a compatibilidade com todos os jogos.
+
+**Exemplo de Configuração:**
+
+\`\`\`c
+// Configuração da memória do Game Gear
+void setup_gamegear_memory(memory_system_t *memory, uint8_t *rom) {
+    // ROM (16KB)
+    memory_add_region(memory, 0x0000, 0x3FFF, rom, MEMORY_ACCESS_READ);
+
+    // RAM (8KB)
+    uint8_t *ram = malloc(8 * 1024);
+    memory_add_region(memory, 0x8000, 0xBFFF, ram, MEMORY_ACCESS_READ | MEMORY_ACCESS_WRITE);
+
+    // VRAM (8KB)
+    uint8_t *vram = malloc(8 * 1024);
+    memory_add_region(memory, 0xC000, 0xDFFF, vram, MEMORY_ACCESS_READ | MEMORY_ACCESS_WRITE);
+
+    // Registradores de I/O, PSG, VDP, etc.
+    memory_add_mapped_region(memory, 0xE000, 0xFFFF,
+                             io_read_callback, io_write_callback,
+                             io_context, MEMORY_ACCESS_READ | MEMORY_ACCESS_WRITE);
+}
+\`\`\`

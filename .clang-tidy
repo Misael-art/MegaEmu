@@ -1,30 +1,172 @@
 Checks: >
-  -*,
-  bugprone-*,
-  cert-*,
-  clang-analyzer-*,
-  cppcoreguidelines-*,
-  modernize-*,
-  performance-*,
-  portability-*,
-  readability-*,
+  *,
+  -fuchsia-*,
+  -google-*,
+  -zircon-*,
+  -abseil-*,
   -modernize-use-trailing-return-type,
-  -readability-magic-numbers
+  -llvm-*,
+  -llvmlibc-*,
+  -android-*,
+  -altera-*,
+  -objc-*,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-identifier-length,
+  -bugprone-easily-swappable-parameters,
+  -misc-non-private-member-variables-in-classes,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -hicpp-signed-bitwise,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -hicpp-no-array-decay,
+  -modernize-use-auto,
+  -hicpp-use-auto,
+  -cppcoreguidelines-pro-type-vararg,
+  -hicpp-vararg,
+  -modernize-use-nodiscard,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-special-member-functions,
+  -hicpp-special-member-functions,
+  -misc-no-recursion,
+  -readability-function-cognitive-complexity,
+  -bugprone-exception-escape,
+  -cert-err58-cpp,
+  -cert-msc32-c,
+  -cert-msc51-cpp,
+  -cert-dcl21-cpp,
+  -modernize-use-default-member-init,
+  -cppcoreguidelines-pro-type-member-init,
+  -hicpp-member-init,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-pro-type-cstyle-cast,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-pro-type-static-cast-downcast,
+  -modernize-use-using,
+  -modernize-use-equals-default,
+  -modernize-use-equals-delete,
+  -modernize-use-emplace,
+  -modernize-return-braced-init-list,
+  -modernize-pass-by-value,
+  -modernize-loop-convert,
+  -modernize-avoid-bind,
+  -modernize-avoid-c-arrays,
+  -modernize-concat-nested-namespaces,
+  -modernize-deprecated-headers,
+  -modernize-deprecated-ios-base-aliases,
+  -modernize-make-shared,
+  -modernize-make-unique,
+  -modernize-raw-string-literal,
+  -modernize-redundant-void-arg,
+  -modernize-replace-auto-ptr,
+  -modernize-replace-disallow-copy-and-assign-macro,
+  -modernize-replace-random-shuffle,
+  -modernize-shrink-to-fit,
+  -modernize-type-traits,
+  -modernize-unary-static-assert,
+  -modernize-use-bool-literals,
+  -modernize-use-noexcept,
+  -modernize-use-nullptr,
+  -modernize-use-override,
+  -modernize-use-transparent-functors,
+  -modernize-use-uncaught-exceptions
 
+WarningsAsErrors: ''
+HeaderFilterRegex: ''
+AnalyzeTemporaryDtors: false
+FormatStyle: none
+User: user
 CheckOptions:
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
   - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.UnionCase
     value: CamelCase
   - key: readability-identifier-naming.FunctionCase
     value: lower_case
+  - key: readability-identifier-naming.MethodCase
+    value: lower_case
   - key: readability-identifier-naming.VariableCase
     value: lower_case
-  - key: readability-identifier-naming.MacroDefinitionCase
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ConstexprVariableCase
     value: UPPER_CASE
   - key: readability-identifier-naming.EnumConstantCase
     value: UPPER_CASE
-  - key: readability-identifier-naming.GlobalConstantCase
+  - key: readability-identifier-naming.MacroDefinitionCase
     value: UPPER_CASE
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key: readability-identifier-naming.TypeAliasCase
+    value: CamelCase
   - key: readability-identifier-naming.TypedefCase
-    value: lower_case_t
-
-FormatStyle: file
+    value: CamelCase
+  - key: readability-identifier-naming.TemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.ValueTemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypeTemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.TemplateTemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: m_
+  - key: readability-identifier-naming.ProtectedMemberPrefix
+    value: m_
+  - key: readability-identifier-naming.GlobalVariablePrefix
+    value: g_
+  - key: readability-identifier-naming.StaticVariablePrefix
+    value: s_
+  - key: readability-identifier-naming.ConstantMemberPrefix
+    value: k_
+  - key: readability-identifier-naming.StaticConstantMemberPrefix
+    value: k_
+  - key: readability-identifier-naming.GlobalConstantPrefix
+    value: k_
+  - key: readability-identifier-naming.StaticConstantPrefix
+    value: k_
+  - key: readability-identifier-naming.ConstexprVariablePrefix
+    value: k_
+  - key: readability-identifier-naming.EnumConstantPrefix
+    value: k_
+  - key: readability-identifier-naming.MacroDefinitionPrefix
+    value: ''
+  - key: readability-identifier-naming.TypedefPrefix
+    value: ''
+  - key: readability-identifier-naming.TypeAliasPrefix
+    value: ''
+  - key: readability-identifier-naming.NamespacePrefix
+    value: ''
+  - key: readability-identifier-naming.ClassPrefix
+    value: ''
+  - key: readability-identifier-naming.StructPrefix
+    value: ''
+  - key: readability-identifier-naming.EnumPrefix
+    value: ''
+  - key: readability-identifier-naming.UnionPrefix
+    value: ''
+  - key: readability-identifier-naming.FunctionPrefix
+    value: ''
+  - key: readability-identifier-naming.MethodPrefix
+    value: ''
+  - key: readability-identifier-naming.VariablePrefix
+    value: ''
+  - key: readability-identifier-naming.ParameterPrefix
+    value: ''
+  - key: readability-identifier-naming.TemplateParameterPrefix
+    value: ''
+  - key: readability-identifier-naming.ValueTemplateParameterPrefix
+    value: ''
+  - key: readability-identifier-naming.TypeTemplateParameterPrefix
+    value: ''
+  - key: readability-identifier-naming.TemplateTemplateParameterPrefix
+    value: ''

@@ -1,1 +1,49 @@
-#include "test_framework.h"#include <stdio.h>// Declarações externas das suítes de testeextern nes_test_suite_t mmc3_test_suite;extern nes_test_suite_t mmc5_test_suite;// Array com todas as suítes de testestatic nes_test_suite_t *test_suites[] = {    &mmc3_test_suite,    &mmc5_test_suite};int main(int argc, char **argv){    printf("Iniciando testes dos mappers do NES...\n\n");    int total_suites = sizeof(test_suites) / sizeof(test_suites[0]);    int total_tests = 0;    int passed_tests = 0;    // Executa todas as suítes de teste    for (int i = 0; i < total_suites; i++)    {        nes_test_suite_t *suite = test_suites[i];        printf("Executando suíte: %s\n", suite->name);        // Setup da suíte        if (suite->suite_setup)        {            suite->suite_setup();        }        // Executa cada teste da suíte        for (int j = 0; j < suite->num_tests; j++)        {            nes_test_case_t *test = &suite->tests[j];            printf("  - %s: ", test->name);            total_tests++;            if (test->run())            {                printf("PASSOU\n");                passed_tests++;            }            else            {                printf("FALHOU\n");                printf("    Descrição: %s\n", test->description);            }        }        // Teardown da suíte        if (suite->suite_teardown)        {            suite->suite_teardown();        }        printf("\n");    }    // Imprime resultados finais    printf("Resultados:\n");    printf("- Total de suítes: %d\n", total_suites);    printf("- Total de testes: %d\n", total_tests);    printf("- Testes passados: %d\n", passed_tests);    printf("- Testes falhos: %d\n", total_tests - passed_tests);    return (passed_tests == total_tests) ? 0 : 1;}
+/**
+ * @file test_mappers.c
+ * @brief Arquivo principal de testes dos mappers NES
+ */
+
+#include <unity.h>
+#include <stdio.h>
+
+// Declarações externas das suítes de teste
+extern nes_test_suite_t mmc3_test_suite;
+extern nes_test_suite_t mmc5_test_suite;
+
+// Array com todas as suítes de testes
+static nes_test_suite_t *test_suites[] = {
+    &mmc3_test_suite,
+    &mmc5_test_suite
+};
+
+// Declarações das funções de teste
+void test_mmc3_init(void);
+void test_mmc3_prg_read(void);
+void test_mmc3_chr_read(void);
+void test_mmc3_bank_switching(void);
+
+void test_mmc5_init(void);
+void test_mmc5_prg_read(void);
+void test_mmc5_chr_read(void);
+void test_mmc5_bank_switching(void);
+
+// Função principal que executa todos os testes
+int main(void) {
+    UNITY_BEGIN();
+
+    // Testes do MMC3
+    printf("\nExecutando testes do MMC3...\n");
+    RUN_TEST(test_mmc3_init);
+    RUN_TEST(test_mmc3_prg_read);
+    RUN_TEST(test_mmc3_chr_read);
+    RUN_TEST(test_mmc3_bank_switching);
+
+    // Testes do MMC5
+    printf("\nExecutando testes do MMC5...\n");
+    RUN_TEST(test_mmc5_init);
+    RUN_TEST(test_mmc5_prg_read);
+    RUN_TEST(test_mmc5_chr_read);
+    RUN_TEST(test_mmc5_bank_switching);
+
+    return UNITY_END();
+}

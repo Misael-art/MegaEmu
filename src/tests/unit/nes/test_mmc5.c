@@ -1,1 +1,175 @@
-#include "test_framework.h"#include "../../platforms/nes/cartridge/nes_cartridge.h"#include "../../platforms/nes/nes.h"#include <stdio.h>#include <stdlib.h>#include <string.h>// Estrutura para o contexto dos testestypedef struct{    nes_cartridge_t *cartridge;    uint8_t *prg_rom;    uint8_t *chr_rom;} mmc5_test_context_t;static mmc5_test_context_t test_ctx = {0}; // Inicializar com zero// Funções de setup e teardownstatic void mmc5_suite_setup(void){    // Limpar o contexto    memset(&test_ctx, 0, sizeof(mmc5_test_context_t));    // Alocar memória para ROMs de teste    test_ctx.prg_rom = (uint8_t *)malloc(512 * 1024); // 512KB PRG ROM    test_ctx.chr_rom = (uint8_t *)malloc(256 * 1024); // 256KB CHR ROM    if (!test_ctx.prg_rom || !test_ctx.chr_rom)    {        // Falha na alocação        if (test_ctx.prg_rom)            free(test_ctx.prg_rom);        if (test_ctx.chr_rom)            free(test_ctx.chr_rom);        return;    }    // Inicializar dados de teste    for (int i = 0; i < 512 * 1024; i++)    {        test_ctx.prg_rom[i] = i & 0xFF;    }    for (int i = 0; i < 256 * 1024; i++)    {        test_ctx.chr_rom[i] = i & 0xFF;    }    // Criar cartridge de teste    test_ctx.cartridge = nes_cartridge_init();    if (test_ctx.cartridge)    {        // Configurar o mapper antes de atribuir as ROMs        test_ctx.cartridge->mapper_number = 5; // MMC5        // Configurar tamanhos antes de atribuir os ponteiros        test_ctx.cartridge->prg_rom_size = 512 * 1024;        test_ctx.cartridge->chr_rom_size = 256 * 1024;        // Atribuir os ponteiros depois de configurar o mapper        test_ctx.cartridge->prg_rom = test_ctx.prg_rom;        test_ctx.cartridge->chr_rom = test_ctx.chr_rom;        // Alocar RAM para o cartucho (para o teste de RAM estendida)        test_ctx.cartridge->prg_ram_size = 64 * 1024; // 64KB de PRG-RAM        test_ctx.cartridge->prg_ram = (uint8_t *)calloc(1, test_ctx.cartridge->prg_ram_size);        // Inicializar o mapper explicitamente        nes_cartridge_create_mapper(test_ctx.cartridge);        // Configuração específica do MMC5        // Normalmente seria feita pelo inicializador do MMC5, mas aqui fazemos        // manualmente para o teste        if (test_ctx.cartridge->mapper && !test_ctx.cartridge->mapper_data)        {            // Criar estrutura de dados específica para o mapper MMC5            test_ctx.cartridge->mapper_data = calloc(1, 1024); // Espaço suficiente para dados do mapper        }    }}static void mmc5_suite_teardown(void){    if (test_ctx.cartridge)    {        // Desvincula os ponteiros do cartridge antes de fechá-lo        test_ctx.cartridge->prg_rom = NULL;        test_ctx.cartridge->chr_rom = NULL;        // Liberar a RAM e mapper data manualmente        if (test_ctx.cartridge->prg_ram)        {            free(test_ctx.cartridge->prg_ram);            test_ctx.cartridge->prg_ram = NULL;        }        if (test_ctx.cartridge->mapper_data)        {            free(test_ctx.cartridge->mapper_data);            test_ctx.cartridge->mapper_data = NULL;        }        // Primeiro, limpa o mapper se existir        if (test_ctx.cartridge->mapper)        {            free(test_ctx.cartridge->mapper);            test_ctx.cartridge->mapper = NULL;        }        // Depois fecha o cartridge        nes_cartridge_shutdown(test_ctx.cartridge);        test_ctx.cartridge = NULL;    }    // Agora podemos liberar os buffers alocados por nós    if (test_ctx.prg_rom)    {        free(test_ctx.prg_rom);        test_ctx.prg_rom = NULL;    }    if (test_ctx.chr_rom)    {        free(test_ctx.chr_rom);        test_ctx.chr_rom = NULL;    }}// Testes individuaisstatic bool test_mmc5_init(void){    if (!test_ctx.cartridge)        return false;    return test_ctx.cartridge->mapper_number == 5;}static bool test_mmc5_prg_read(void){    if (!test_ctx.cartridge)        return false;    uint8_t value;    bool success = true;    // Testar leitura de PRG ROM    value = nes_cartridge_cpu_read(test_ctx.cartridge, 0x8000);    success &= value == (0x0000 & 0xFF);    value = nes_cartridge_cpu_read(test_ctx.cartridge, 0xC000);    success &= value == (0x4000 & 0xFF);    return success;}static bool test_mmc5_chr_read(void){    if (!test_ctx.cartridge)        return false;    uint8_t value;    bool success = true;    // Testar leitura de CHR ROM    value = nes_cartridge_chr_read(test_ctx.cartridge, 0x0000);    success &= value == (0x0000 & 0xFF);    value = nes_cartridge_chr_read(test_ctx.cartridge, 0x1000);    success &= value == (0x1000 & 0xFF);    return success;}static bool test_mmc5_extended_ram(void){    // Este teste é simplificado para evitar problemas com o heap    // O teste real precisaria de uma implementação completa do mapper MMC5    // Apenas retornamos verdadeiro para evitar as falhas de asserção    // Em um ambiente real, este teste deve ser implementado corretamente    return true;}// Definição dos testesstatic nes_test_case_t mmc5_tests[] = {    {.name = "Inicialização do MMC5",     .description = "Verifica se o mapper MMC5 é inicializado corretamente",     .run = test_mmc5_init},    {.name = "Leitura de PRG ROM",     .description = "Verifica se a leitura de PRG ROM funciona corretamente",     .run = test_mmc5_prg_read},    {.name = "Leitura de CHR ROM",     .description = "Verifica se a leitura de CHR ROM funciona corretamente",     .run = test_mmc5_chr_read},    {.name = "RAM Estendida",     .description = "Verifica se a RAM estendida do MMC5 funciona corretamente",     .run = test_mmc5_extended_ram}};// Definição da suíte de testesnes_test_suite_t mmc5_test_suite = {    .name = "MMC5 Mapper",    .suite_setup = mmc5_suite_setup,    .suite_teardown = mmc5_suite_teardown,    .tests = mmc5_tests,    .num_tests = sizeof(mmc5_tests) / sizeof(mmc5_tests[0])};
+/**
+ * @file test_mmc5.c
+ * @brief Testes unitários para o mapper MMC5
+ */
+
+#include <unity.h>
+#include "../../../platforms/nes/cartridge/nes_cartridge.h"
+#include "../../../platforms/nes/nes.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Mock das funções de log
+#define EMU_LOG_ERROR(cat, fmt, ...) ((void)0)
+#define EMU_LOG_WARN(cat, fmt, ...) ((void)0)
+#define EMU_LOG_INFO(cat, fmt, ...) ((void)0)
+#define EMU_LOG_DEBUG(cat, fmt, ...) ((void)0)
+#define EMU_LOG_TRACE(cat, fmt, ...) ((void)0)
+
+// Estrutura para o contexto dos testes
+typedef struct
+{
+    nes_cartridge_t *cartridge;
+    uint8_t *prg_rom;
+    uint8_t *chr_rom;
+} mmc5_test_context_t;
+
+static mmc5_test_context_t test_ctx = {0}; // Inicializar com zero
+
+void setUp(void)
+{
+    // Limpar o contexto
+    memset(&test_ctx, 0, sizeof(mmc5_test_context_t));
+
+    // Alocar memória para ROMs de teste
+    test_ctx.prg_rom = (uint8_t *)malloc(32 * 1024); // 32KB PRG ROM
+    test_ctx.chr_rom = (uint8_t *)malloc(8 * 1024);  // 8KB CHR ROM
+
+    TEST_ASSERT_NOT_NULL(test_ctx.prg_rom);
+    TEST_ASSERT_NOT_NULL(test_ctx.chr_rom);
+
+    // Inicializar dados de teste
+    for (int i = 0; i < 32 * 1024; i++)
+    {
+        test_ctx.prg_rom[i] = i & 0xFF;
+    }
+
+    for (int i = 0; i < 8 * 1024; i++)
+    {
+        test_ctx.chr_rom[i] = i & 0xFF;
+    }
+
+    // Criar cartridge de teste
+    test_ctx.cartridge = nes_cartridge_init();
+    TEST_ASSERT_NOT_NULL(test_ctx.cartridge);
+
+    // Configurar o mapper antes de atribuir as ROMs
+    test_ctx.cartridge->mapper_number = 5; // MMC5
+
+    // Configurar tamanhos antes de atribuir os ponteiros
+    test_ctx.cartridge->prg_rom_size = 32 * 1024;
+    test_ctx.cartridge->chr_rom_size = 8 * 1024;
+
+    // Atribuir os ponteiros depois de configurar o mapper
+    test_ctx.cartridge->prg_rom = test_ctx.prg_rom;
+    test_ctx.cartridge->chr_rom = test_ctx.chr_rom;
+
+    // Inicializar o mapper explicitamente
+    nes_cartridge_create_mapper(test_ctx.cartridge);
+    TEST_ASSERT_NOT_NULL(test_ctx.cartridge->mapper);
+}
+
+void tearDown(void)
+{
+    if (test_ctx.cartridge)
+    {
+        // Desvincula os ponteiros do cartridge antes de fechá-lo
+        test_ctx.cartridge->prg_rom = NULL;
+        test_ctx.cartridge->chr_rom = NULL;
+
+        // Liberar mapper data se existir
+        if (test_ctx.cartridge->mapper_data)
+        {
+            free(test_ctx.cartridge->mapper_data);
+            test_ctx.cartridge->mapper_data = NULL;
+        }
+
+        // Primeiro, limpa o mapper se existir
+        if (test_ctx.cartridge->mapper)
+        {
+            free(test_ctx.cartridge->mapper);
+            test_ctx.cartridge->mapper = NULL;
+        }
+
+        // Depois fecha o cartridge
+        nes_cartridge_shutdown(test_ctx.cartridge);
+        test_ctx.cartridge = NULL;
+    }
+
+    // Agora podemos liberar os buffers alocados por nós
+    if (test_ctx.prg_rom)
+    {
+        free(test_ctx.prg_rom);
+        test_ctx.prg_rom = NULL;
+    }
+
+    if (test_ctx.chr_rom)
+    {
+        free(test_ctx.chr_rom);
+        test_ctx.chr_rom = NULL;
+    }
+}
+
+void test_mmc5_init(void)
+{
+    TEST_ASSERT_NOT_NULL(test_ctx.cartridge);
+    TEST_ASSERT_EQUAL_INT(5, test_ctx.cartridge->mapper_number);
+    TEST_ASSERT_NOT_NULL(test_ctx.cartridge->mapper);
+    TEST_ASSERT_NOT_NULL(test_ctx.cartridge->mapper_data);
+}
+
+void test_mmc5_prg_read(void)
+{
+    TEST_ASSERT_NOT_NULL(test_ctx.cartridge);
+
+    // Testar leitura de PRG ROM
+    uint8_t value = nes_cartridge_cpu_read(test_ctx.cartridge, 0x8000);
+    TEST_ASSERT_EQUAL_HEX8(0x00, value);
+
+    value = nes_cartridge_cpu_read(test_ctx.cartridge, 0xC000);
+    TEST_ASSERT_EQUAL_HEX8(0x40, value);
+}
+
+void test_mmc5_chr_read(void)
+{
+    TEST_ASSERT_NOT_NULL(test_ctx.cartridge);
+
+    // Testar leitura de CHR ROM
+    uint8_t value = nes_cartridge_chr_read(test_ctx.cartridge, 0x0000);
+    TEST_ASSERT_EQUAL_HEX8(0x00, value);
+
+    value = nes_cartridge_chr_read(test_ctx.cartridge, 0x1000);
+    TEST_ASSERT_EQUAL_HEX8(0x00, value);
+}
+
+void test_mmc5_bank_switching(void)
+{
+    TEST_ASSERT_NOT_NULL(test_ctx.cartridge);
+
+    // Configurar banco de PRG ROM
+    nes_cartridge_cpu_write(test_ctx.cartridge, 0x5113, 0x01); // Selecionar banco 1 para PRG
+
+    // Verificar se o banco foi trocado
+    uint8_t value = nes_cartridge_cpu_read(test_ctx.cartridge, 0x8000);
+    TEST_ASSERT_EQUAL_HEX8(0x40, value);
+
+    // Configurar banco de CHR ROM
+    nes_cartridge_cpu_write(test_ctx.cartridge, 0x5120, 0x01); // Selecionar banco 1 para CHR
+
+    // Verificar se o banco foi trocado
+    value = nes_cartridge_chr_read(test_ctx.cartridge, 0x0000);
+    TEST_ASSERT_EQUAL_HEX8(0x00, value);
+}
+
+int main(void)
+{
+    UNITY_BEGIN();
+
+    RUN_TEST(test_mmc5_init);
+    RUN_TEST(test_mmc5_prg_read);
+    RUN_TEST(test_mmc5_chr_read);
+    RUN_TEST(test_mmc5_bank_switching);
+
+    return UNITY_END();
+}

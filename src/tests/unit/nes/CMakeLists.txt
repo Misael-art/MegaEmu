@@ -1,1 +1,30 @@
-# CMakeLists.txt para testes do NEScmake_minimum_required(VERSION 3.10)# Adiciona os arquivos fonte do framework de testesset(TEST_FRAMEWORK_SOURCES    test_framework.c    test_framework.h)# Adiciona os arquivos fonte dos testesset(TEST_SOURCES    test_mappers.c    test_mmc3.c    test_mmc5.c)# Cria o executável de testeadd_executable(test_mappers    ${TEST_FRAMEWORK_SOURCES}    ${TEST_SOURCES})# Inclui diretórios necessáriostarget_include_directories(test_mappers PRIVATE    ${CMAKE_SOURCE_DIR}/src    ${CMAKE_SOURCE_DIR}/src/platforms/nes    ${CMAKE_CURRENT_SOURCE_DIR})# Vincula com as bibliotecas necessáriastarget_link_libraries(test_mappers PRIVATE    emu_nes)# Define flags de compilaçãotarget_compile_definitions(test_mappers PRIVATE    -DTEST_BUILD)# Configura o diretório de saídaset_target_properties(test_mappers PROPERTIES    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
+# Configuração do projeto de testes
+cmake_minimum_required(VERSION 3.10)
+
+# Adiciona os arquivos fonte dos testes
+set(TEST_SOURCES
+    test_mappers.c
+    test_mmc3.c
+    test_mmc5.c)
+
+# Adiciona o Unity como dependência
+include(FetchContent)
+FetchContent_Declare(
+    unity
+    GIT_REPOSITORY https://github.com/ThrowTheSwitch/Unity.git
+    GIT_TAG v2.5.2
+)
+FetchContent_MakeAvailable(unity)
+
+# Cria o executável de teste
+add_executable(test_mappers ${TEST_SOURCES})
+
+# Adiciona os diretórios de include
+target_include_directories(test_mappers PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${unity_SOURCE_DIR}/src)
+
+# Vincula as bibliotecas necessárias
+target_link_libraries(test_mappers PRIVATE
+    unity
+    nes_core)

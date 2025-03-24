@@ -1,1 +1,266 @@
-/** * @file test_state.c * @brief Testes unitários para o sistema de estado */#include <stdio.h>#include <stdlib.h>#include <string.h>#include <assert.h>#include "core/state/state_interface.h"#include "test_common.h"// Variáveis para testesstatic int g_progress_callback_called = 0;static int g_progress_percentage = 0;static char g_progress_message[256] = {0};static int g_rom_verify_callback_called = 0;static char g_rom_hash[64] = {0};static int g_rom_verify_result = 1;// Callback de progresso para testesstatic void test_progress_callback(int percentage, const char *message, void *userdata){    g_progress_callback_called = 1;    g_progress_percentage = percentage;    if (message)    {        strncpy(g_progress_message, message, sizeof(g_progress_message) - 1);    }    else    {        g_progress_message[0] = '\0';    }}// Callback de verificação de ROM para testesstatic int test_rom_verify_callback(const char *rom_hash, void *userdata){    g_rom_verify_callback_called = 1;    if (rom_hash)    {        strncpy(g_rom_hash, rom_hash, sizeof(g_rom_hash) - 1);    }    else    {        g_rom_hash[0] = '\0';    }    return g_rom_verify_result;}// Inicializar e finalizar o testestatic void test_setup(void){    g_progress_callback_called = 0;    g_progress_percentage = 0;    memset(g_progress_message, 0, sizeof(g_progress_message));    g_rom_verify_callback_called = 0;    memset(g_rom_hash, 0, sizeof(g_rom_hash));    g_rom_verify_result = 1;}// Teste de inicializaçãostatic void test_init(void){    const emu_state_interface_t *state = emu_state_get_interface();    assert(state != NULL);    int result = state->init();    assert(result == 0);    // Tentar inicializar novamente    result = state->init();    assert(result == 0); // Deve retornar sucesso mesmo já inicializado    state->shutdown();}// Teste de slot de estadostatic void test_state_slot(void){    const emu_state_interface_t *state = emu_state_get_interface();    assert(state != NULL);    state->init();    // Configurar callback de progresso    int result = state->set_progress_callback(test_progress_callback, NULL);    assert(result == 0);    // Tentar salvar em slot sem plataforma (deve falhar)    result = state->save_state(0, "Teste");    assert(result == -1);    // Tentar carregar de slot sem plataforma (deve falhar)    result = state->load_state(0);    assert(result == -1);    // Tentar usar slot inválido (deve falhar)    result = state->save_state(-1, "Teste");    assert(result == -1);    result = state->save_state(100, "Teste");    assert(result == -1);    state->shutdown();}// Teste de arquivo de estadostatic void test_state_file(void){    const emu_state_interface_t *state = emu_state_get_interface();    assert(state != NULL);    state->init();    // Configurar callback de progresso    int result = state->set_progress_callback(test_progress_callback, NULL);    assert(result == 0);    // Tentar salvar para arquivo sem plataforma (deve falhar)    result = state->save_state_to_file("test_state.dat", "Teste");    assert(result == -1);    // Tentar carregar de arquivo sem plataforma (deve falhar)    result = state->load_state_from_file("test_state.dat");    assert(result == -1);    // Tentar carregar arquivo inexistente (deve falhar)    result = state->load_state_from_file("nonexistent_file.dat");    assert(result == -1);    state->shutdown();}// Teste de snapshotsstatic void test_snapshots(void){    const emu_state_interface_t *state = emu_state_get_interface();    assert(state != NULL);    state->init();    // Tentar criar snapshot sem plataforma (deve falhar)    int result = state->create_snapshot();    assert(result == -1);    // Tentar restaurar snapshot inexistente (deve falhar)    result = state->restore_snapshot(0);    assert(result == -1);    // Tentar restaurar snapshot com ID inválido (deve falhar)    result = state->restore_snapshot(-1);    assert(result == -1);    result = state->restore_snapshot(100);    assert(result == -1);    // Tentar excluir snapshot inexistente (deve falhar)    result = state->delete_snapshot(0);    assert(result == -1);    // Verificar contagem de snapshots    int count = state->get_snapshot_count();    assert(count == 0);    state->shutdown();}// Teste de resetstatic void test_reset(void){    const emu_state_interface_t *state = emu_state_get_interface();    assert(state != NULL);    state->init();    // Tentar reset sem plataforma (deve falhar)    int result = state->reset(EMU_STATE_TYPE_RESET);    assert(result == -1);    // Tentar reset com tipo inválido (deve falhar)    result = state->reset(EMU_STATE_TYPE_MAX);    assert(result == -1);    state->shutdown();}// Teste de rebobinagemstatic void test_rewind(void){    const emu_state_interface_t *state = emu_state_get_interface();    assert(state != NULL);    state->init();    // Tentar rebobinar sem habilitar (deve falhar)    int result = state->rewind(10);    assert(result == -1);    // Habilitar rebobinagem    result = state->enable_rewind(1);    assert(result == 0);    // Tentar rebobinar sem plataforma (deve falhar)    result = state->rewind(10);    assert(result == -1);    // Tentar rebobinar com frames inválidos (deve falhar)    result = state->rewind(0);    assert(result == -1);    result = state->rewind(-10);    assert(result == -1);    // Configurar buffer de rebobinagem    result = state->set_rewind_buffer_frames(120);    assert(result == 0);    // Desabilitar rebobinagem    result = state->enable_rewind(0);    assert(result == 0);    state->shutdown();}// Teste de callbackstatic void test_callbacks(void){    const emu_state_interface_t *state = emu_state_get_interface();    assert(state != NULL);    test_setup();    state->init();    // Registrar callback de progresso    int result = state->set_progress_callback(test_progress_callback, NULL);    assert(result == 0);    // Registrar callback de verificação de ROM    result = state->set_rom_verify_callback(test_rom_verify_callback, NULL);    assert(result == 0);    state->shutdown();}// Teste de configuração de autosavestatic void test_autosave_config(void){    const emu_state_interface_t *state = emu_state_get_interface();    assert(state != NULL);    state->init();    // Configurar intervalo de autosave    int result = state->set_autosave_interval(60);    assert(result == 0);    // Tentar configurar intervalo inválido (deve falhar)    result = state->set_autosave_interval(-1);    assert(result == -1);    state->shutdown();}// Teste de mensagens de errostatic void test_error_messages(void){    const emu_state_interface_t *state = emu_state_get_interface();    assert(state != NULL);    // Verificar se todas as mensagens de erro estão definidas    for (int i = 0; i < EMU_STATE_ERROR_MAX; i++)    {        const char *message = state->get_error_string((emu_state_error_t)i);        assert(message != NULL);        assert(strlen(message) > 0);    }}// Executar todos os testesvoid test_state_run_all(void){    printf("Executando testes do sistema de estado...\n");    test_init();    printf("✓ Teste de inicialização passou\n");    test_state_slot();    printf("✓ Teste de slot de estado passou\n");    test_state_file();    printf("✓ Teste de arquivo de estado passou\n");    test_snapshots();    printf("✓ Teste de snapshots passou\n");    test_reset();    printf("✓ Teste de reset passou\n");    test_rewind();    printf("✓ Teste de rebobinagem passou\n");    test_callbacks();    printf("✓ Teste de callbacks passou\n");    test_autosave_config();    printf("✓ Teste de configuração de autosave passou\n");    test_error_messages();    printf("✓ Teste de mensagens de erro passou\n");    printf("✓ Todos os testes do sistema de estado passaram!\n\n");}
+/**
+ * @file test_state.c
+ * @brief Testes unitários para o sistema de estado
+ */
+
+#include <unity.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "core/state/state_interface.h"
+
+// Variáveis para testes
+static int g_progress_callback_called = 0;
+static int g_progress_percentage = 0;
+static char g_progress_message[256] = {0};
+static int g_rom_verify_callback_called = 0;
+static char g_rom_hash[64] = {0};
+static int g_rom_verify_result = 1;
+
+// Callback de progresso para testes
+static void test_progress_callback(int percentage, const char *message, void *userdata)
+{
+    g_progress_callback_called = 1;
+    g_progress_percentage = percentage;
+    if (message)
+    {
+        strncpy(g_progress_message, message, sizeof(g_progress_message) - 1);
+    }
+    else
+    {
+        g_progress_message[0] = '\0';
+    }
+}
+
+// Callback de verificação de ROM para testes
+static int test_rom_verify_callback(const char *rom_hash, void *userdata)
+{
+    g_rom_verify_callback_called = 1;
+    if (rom_hash)
+    {
+        strncpy(g_rom_hash, rom_hash, sizeof(g_rom_hash) - 1);
+    }
+    else
+    {
+        g_rom_hash[0] = '\0';
+    }
+    return g_rom_verify_result;
+}
+
+void setUp(void)
+{
+    g_progress_callback_called = 0;
+    g_progress_percentage = 0;
+    memset(g_progress_message, 0, sizeof(g_progress_message));
+    g_rom_verify_callback_called = 0;
+    memset(g_rom_hash, 0, sizeof(g_rom_hash));
+    g_rom_verify_result = 1;
+}
+
+void tearDown(void)
+{
+    const emu_state_interface_t *state = emu_state_get_interface();
+    if (state)
+    {
+        state->shutdown();
+    }
+}
+
+void test_init(void)
+{
+    const emu_state_interface_t *state = emu_state_get_interface();
+    TEST_ASSERT_NOT_NULL(state);
+
+    int result = state->init();
+    TEST_ASSERT_EQUAL(0, result);
+
+    // Tentar inicializar novamente
+    result = state->init();
+    TEST_ASSERT_EQUAL(0, result); // Deve retornar sucesso mesmo já inicializado
+}
+
+void test_state_slot(void)
+{
+    const emu_state_interface_t *state = emu_state_get_interface();
+    TEST_ASSERT_NOT_NULL(state);
+    TEST_ASSERT_EQUAL(0, state->init());
+
+    // Configurar callback de progresso
+    int result = state->set_progress_callback(test_progress_callback, NULL);
+    TEST_ASSERT_EQUAL(0, result);
+
+    // Tentar salvar em slot sem plataforma (deve falhar)
+    result = state->save_state(0, "Teste");
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Tentar carregar de slot sem plataforma (deve falhar)
+    result = state->load_state(0);
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Tentar usar slot inválido (deve falhar)
+    result = state->save_state(-1, "Teste");
+    TEST_ASSERT_EQUAL(-1, result);
+    result = state->save_state(100, "Teste");
+    TEST_ASSERT_EQUAL(-1, result);
+}
+
+void test_state_file(void)
+{
+    const emu_state_interface_t *state = emu_state_get_interface();
+    TEST_ASSERT_NOT_NULL(state);
+    TEST_ASSERT_EQUAL(0, state->init());
+
+    // Configurar callback de progresso
+    int result = state->set_progress_callback(test_progress_callback, NULL);
+    TEST_ASSERT_EQUAL(0, result);
+
+    // Tentar salvar para arquivo sem plataforma (deve falhar)
+    result = state->save_state_to_file("test_state.dat", "Teste");
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Tentar carregar de arquivo sem plataforma (deve falhar)
+    result = state->load_state_from_file("test_state.dat");
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Tentar carregar arquivo inexistente (deve falhar)
+    result = state->load_state_from_file("nonexistent_file.dat");
+    TEST_ASSERT_EQUAL(-1, result);
+}
+
+void test_snapshots(void)
+{
+    const emu_state_interface_t *state = emu_state_get_interface();
+    TEST_ASSERT_NOT_NULL(state);
+    TEST_ASSERT_EQUAL(0, state->init());
+
+    // Tentar criar snapshot sem plataforma (deve falhar)
+    int result = state->create_snapshot();
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Tentar restaurar snapshot inexistente (deve falhar)
+    result = state->restore_snapshot(0);
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Tentar restaurar snapshot com ID inválido (deve falhar)
+    result = state->restore_snapshot(-1);
+    TEST_ASSERT_EQUAL(-1, result);
+    result = state->restore_snapshot(100);
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Tentar excluir snapshot inexistente (deve falhar)
+    result = state->delete_snapshot(0);
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Verificar contagem de snapshots
+    int count = state->get_snapshot_count();
+    TEST_ASSERT_EQUAL(0, count);
+}
+
+void test_reset(void)
+{
+    const emu_state_interface_t *state = emu_state_get_interface();
+    TEST_ASSERT_NOT_NULL(state);
+    TEST_ASSERT_EQUAL(0, state->init());
+
+    // Tentar reset sem plataforma (deve falhar)
+    int result = state->reset(EMU_STATE_TYPE_RESET);
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Tentar reset com tipo inválido (deve falhar)
+    result = state->reset(EMU_STATE_TYPE_MAX);
+    TEST_ASSERT_EQUAL(-1, result);
+}
+
+void test_rewind(void)
+{
+    const emu_state_interface_t *state = emu_state_get_interface();
+    TEST_ASSERT_NOT_NULL(state);
+    TEST_ASSERT_EQUAL(0, state->init());
+
+    // Tentar rebobinar sem habilitar (deve falhar)
+    int result = state->rewind(10);
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Habilitar rebobinagem
+    result = state->enable_rewind(1);
+    TEST_ASSERT_EQUAL(0, result);
+
+    // Tentar rebobinar sem plataforma (deve falhar)
+    result = state->rewind(10);
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Tentar rebobinar com frames inválidos (deve falhar)
+    result = state->rewind(0);
+    TEST_ASSERT_EQUAL(-1, result);
+    result = state->rewind(-10);
+    TEST_ASSERT_EQUAL(-1, result);
+
+    // Configurar buffer de rebobinagem
+    result = state->set_rewind_buffer_frames(120);
+    TEST_ASSERT_EQUAL(0, result);
+
+    // Desabilitar rebobinagem
+    result = state->enable_rewind(0);
+    TEST_ASSERT_EQUAL(0, result);
+}
+
+void test_callbacks(void)
+{
+    const emu_state_interface_t *state = emu_state_get_interface();
+    TEST_ASSERT_NOT_NULL(state);
+    TEST_ASSERT_EQUAL(0, state->init());
+
+    // Registrar callback de progresso
+    int result = state->set_progress_callback(test_progress_callback, NULL);
+    TEST_ASSERT_EQUAL(0, result);
+
+    // Registrar callback de verificação de ROM
+    result = state->set_rom_verify_callback(test_rom_verify_callback, NULL);
+    TEST_ASSERT_EQUAL(0, result);
+}
+
+void test_autosave_config(void)
+{
+    const emu_state_interface_t *state = emu_state_get_interface();
+    TEST_ASSERT_NOT_NULL(state);
+    TEST_ASSERT_EQUAL(0, state->init());
+
+    // Configurar intervalo de autosave
+    int result = state->set_autosave_interval(60);
+    TEST_ASSERT_EQUAL(0, result);
+
+    // Tentar configurar intervalo inválido (deve falhar)
+    result = state->set_autosave_interval(-1);
+    TEST_ASSERT_EQUAL(-1, result);
+}
+
+void test_error_messages(void)
+{
+    const emu_state_interface_t *state = emu_state_get_interface();
+    TEST_ASSERT_NOT_NULL(state);
+
+    // Verificar se todas as mensagens de erro estão definidas
+    for (int i = 0; i < EMU_STATE_ERROR_MAX; i++)
+    {
+        const char *message = state->get_error_string((emu_state_error_t)i);
+        TEST_ASSERT_NOT_NULL(message);
+        TEST_ASSERT_GREATER_THAN(0, strlen(message));
+    }
+}
+
+int main(void)
+{
+    UNITY_BEGIN();
+
+    RUN_TEST(test_init);
+    RUN_TEST(test_state_slot);
+    RUN_TEST(test_state_file);
+    RUN_TEST(test_snapshots);
+    RUN_TEST(test_reset);
+    RUN_TEST(test_rewind);
+    RUN_TEST(test_callbacks);
+    RUN_TEST(test_autosave_config);
+    RUN_TEST(test_error_messages);
+
+    return UNITY_END();
+}

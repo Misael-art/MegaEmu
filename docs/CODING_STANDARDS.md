@@ -16,6 +16,7 @@ Este documento define os padrões de codificação para o projeto Mega Emu. Todo
 8. [Estruturas e Enumerações](#estruturas-e-enumerações)
 9. [Tratamento de Erros](#tratamento-de-erros)
 10. [Práticas Específicas por Plataforma](#práticas-específicas-por-plataforma)
+11. [Padrões de Compilação](#padrões-de-compilação)
 
 ## Estilo Geral
 
@@ -524,6 +525,110 @@ src/
 4. **Autenticação**:
    - Implemente autenticação para endpoints sensíveis
    - Use padrões modernos (JWT, OAuth quando aplicável)
+
+## Padrões de Compilação
+
+### Estrutura de Build
+
+1. **Organização de Diretórios**
+   - Manter estrutura hierárquica clara
+   - Separar builds por componente
+   - Usar diretórios temporários para builds intermediários
+   - Manter builds de release isolados
+
+2. **Scripts de Build**
+   - Usar PowerShell para scripts de build
+   - Manter parâmetros consistentes entre scripts
+   - Documentar todas as opções de build
+   - Implementar verificações de ambiente
+
+3. **CMake**
+   - Usar CMake moderno (3.20+)
+   - Definir opções claras para cada componente
+   - Manter dependências organizadas
+   - Implementar testes adequadamente
+
+### Flags e Opções
+
+1. **Flags de Compilação**
+
+   ```cmake
+   # Windows (MSVC)
+   add_compile_options(/W4 /WX)
+
+   # Unix (GCC/Clang)
+   add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+   ```
+
+2. **Opções de Build**
+
+   ```cmake
+   option(BUILD_TESTS "Build tests" OFF)
+   option(USE_SDL2 "Use SDL2 for graphics and audio" ON)
+   option(BUILD_NES "Build NES emulation" ON)
+   option(BUILD_MEGADRIVE "Build Mega Drive emulation" ON)
+   option(BUILD_MASTERSYSTEM "Build Master System emulation" ON)
+   ```
+
+3. **Configuração de Dependências**
+   - Usar vcpkg para gerenciamento de pacotes
+   - Especificar versões exatas das dependências
+   - Documentar requisitos de sistema
+   - Manter manifesto vcpkg atualizado
+
+### Processo de Build
+
+1. **Verificação de Ambiente**
+
+   ```powershell
+   # Sequência de verificação
+   .\scripts\build\check_environment.ps1
+   .\scripts\build\setup_vcpkg.ps1
+   ```
+
+2. **Compilação**
+
+   ```powershell
+   # Build padrão
+   .\scripts\build\build_all.ps1 -BuildType Release
+   ```
+
+3. **Testes**
+
+   ```powershell
+   # Execução de testes
+   .\scripts\build\run_tests.ps1 -Verbose
+   ```
+
+4. **Validação**
+
+   ```powershell
+   # Verificação de binários
+   .\scripts\build\verify_binaries.ps1
+   ```
+
+### Documentação
+
+1. **Comentários de Build**
+
+   ```cmake
+   # Exemplo de documentação em CMake
+   # Configurar componente X
+   # Requer: dependência Y versão Z
+   add_subdirectory(componente_x)
+   ```
+
+2. **Logs de Build**
+   - Manter logs detalhados
+   - Documentar erros comuns
+   - Incluir soluções para problemas
+   - Registrar decisões de build
+
+3. **Documentação de Release**
+   - Documentar processo de build
+   - Listar dependências
+   - Especificar requisitos
+   - Incluir instruções de instalação
 
 ---
 

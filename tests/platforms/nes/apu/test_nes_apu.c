@@ -6,229 +6,211 @@
  * @date 2025-03-21
  */
 
+#include <unity.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <assert.h>
 #include "../../../../src/platforms/nes/apu/nes_apu.hpp"
-#include "../../../../src/utils/test_utils.h"
 
 // Mocks e stubs necessários
-typedef struct {
+typedef struct
+{
     uint8_t registers[8];
     int irq_triggered;
 } MockCPU;
 
-typedef struct {
+typedef struct
+{
     uint8_t data[0x10000];
-    uint8_t read(uint16_t address) {
+    uint8_t read(uint16_t address)
+    {
         return data[address];
     }
-    void write(uint16_t address, uint8_t value) {
+    void write(uint16_t address, uint8_t value)
+    {
         data[address] = value;
     }
 } MockMemory;
 
 // Variáveis globais para os testes
-static MockCPU* cpu;
-static MockMemory* memory;
-static MegaEmu::Platforms::NES::NESAPU* apu;
+static MockCPU *cpu;
+static MockMemory *memory;
+static MegaEmu::Platforms::NES::NESAPU *apu;
 static int16_t test_buffer[1024];
 
-/**
- * @brief Configura o ambiente para os testes
- */
-static void setup(void)
+void setUp(void)
 {
     // Alocar memória para os mocks
-    cpu = (MockCPU*)malloc(sizeof(MockCPU));
-    memory = (MockMemory*)malloc(sizeof(MockMemory));
-    
+    cpu = (MockCPU *)malloc(sizeof(MockCPU));
+    memory = (MockMemory *)malloc(sizeof(MockMemory));
+
     // Inicializar memória com valores padrão
     memset(memory->data, 0, sizeof(memory->data));
-    
+
     // Inicializar CPU
     memset(cpu->registers, 0, sizeof(cpu->registers));
     cpu->irq_triggered = 0;
-    
+
     // Criar instância do APU
     apu = new MegaEmu::Platforms::NES::NESAPU(
-        static_cast<void*>(cpu),
-        static_cast<void*>(memory),
-        44100  // Taxa de amostragem padrão
+        static_cast<void *>(cpu),
+        static_cast<void *>(memory),
+        44100 // Taxa de amostragem padrão
     );
-    
+
     // Limpar buffer de teste
     memset(test_buffer, 0, sizeof(test_buffer));
 }
 
-/**
- * @brief Limpa o ambiente após os testes
- */
-static void teardown(void)
+void tearDown(void)
 {
     delete apu;
     free(memory);
     free(cpu);
 }
 
-/**
- * @brief Testa a inicialização do APU
- */
 void test_initialization(void)
 {
-    printf("Testando inicialização do APU...\n");
-    
     // Verificar se o APU foi inicializado corretamente
-    assert(apu != NULL);
-    
+    TEST_ASSERT_NOT_NULL(apu);
+
     // Verificar estado inicial
     apu->initialize();
-    
+
     // Verificar se os registradores foram inicializados corretamente
-    // Isso depende da implementação específica do APU
-    
-    printf("Teste de inicialização concluído com sucesso!\n");
+    TEST_ASSERT_EQUAL_UINT8(0, apu->readRegister(0x4000)); // Pulse 1 control
+    TEST_ASSERT_EQUAL_UINT8(0, apu->readRegister(0x4004)); // Pulse 2 control
+    TEST_ASSERT_EQUAL_UINT8(0, apu->readRegister(0x4008)); // Triangle control
+    TEST_ASSERT_EQUAL_UINT8(0, apu->readRegister(0x400C)); // Noise control
+    TEST_ASSERT_EQUAL_UINT8(0, apu->readRegister(0x4010)); // DMC control
+    TEST_ASSERT_EQUAL_UINT8(0, apu->readRegister(0x4015)); // Status register
 }
 
-/**
- * @brief Testa a execução de ciclos do APU
- */
 void test_cycle(void)
 {
-    printf("Testando execução de ciclos do APU...\n");
-    
+    // Configurar alguns registradores para teste
+    apu->writeRegister(0x4000, 0x3F); // Pulse 1: volume máximo, duty 0
+    apu->writeRegister(0x4002, 0x70); // Pulse 1: período baixo
+    apu->writeRegister(0x4003, 0x08); // Pulse 1: período alto
+
+    // Habilitar canal
+    apu->writeRegister(0x4015, 0x01); // Habilitar Pulse 1
+
     // Executar alguns ciclos
-    apu->cycle(100);
-    
-    // Verificar se o estado interno foi atualizado
-    // Isso depende da implementação específica do APU
-    
-    printf("Teste de ciclo concluído com sucesso!\n");
+    for (int i = 0; i < 100; i++)
+    {
+        apu->cycle();
+    }
+
+    // Verificar se o canal está ativo
+    TEST_ASSERT_NOT_EQUAL(0, apu->readRegister(0x4015) & 0x01);
 }
 
-/**
- * @brief Testa a geração de amostras de áudio
- */
 void test_generate_samples(void)
 {
-    printf("Testando geração de amostras de áudio...\n");
-    
+    // Configurar canal pulse para gerar som
+    apu->writeRegister(0x4000, 0x3F); // Pulse 1: volume máximo, duty 0
+    apu->writeRegister(0x4002, 0x70); // Pulse 1: período baixo
+    apu->writeRegister(0x4003, 0x08); // Pulse 1: período alto
+    apu->writeRegister(0x4015, 0x01); // Habilitar Pulse 1
+
     // Gerar algumas amostras
-    int num_samples = 256;
-    int samples_generated = apu->generateSamples(test_buffer, num_samples);
-    
-    // Verificar se as amostras foram geradas
-    assert(samples_generated == num_samples);
-    
-    // Verificar se as amostras estão dentro de um intervalo válido
-    for (int i = 0; i < num_samples; i++) {
-        assert(test_buffer[i] >= -32768 && test_buffer[i] <= 32767);
+    int samples_generated = apu->generateSamples(test_buffer, 100);
+
+    // Verificar se amostras foram geradas
+    TEST_ASSERT_EQUAL(100, samples_generated);
+
+    // Verificar se as amostras não são todas zero
+    bool has_non_zero = false;
+    for (int i = 0; i < 100; i++)
+    {
+        if (test_buffer[i] != 0)
+        {
+            has_non_zero = true;
+            break;
+        }
     }
-    
-    printf("Teste de geração de amostras concluído com sucesso!\n");
+    TEST_ASSERT_TRUE(has_non_zero);
 }
 
-/**
- * @brief Testa a leitura e escrita de registradores
- */
 void test_register_read_write(void)
 {
-    printf("Testando leitura e escrita de registradores...\n");
-    
-    // Escrever em alguns registradores
-    for (uint16_t addr = 0x4000; addr <= 0x4013; addr++) {
-        memory->write(addr, 0x55);
-    }
-    
-    // Executar ciclos para processar as escritas
-    apu->cycle(100);
-    
-    // Ler os registradores
-    for (uint16_t addr = 0x4000; addr <= 0x4013; addr++) {
-        uint8_t value = memory->read(addr);
-        // Verificar se os valores foram processados corretamente
-        // Isso depende da implementação específica do APU
-    }
-    
-    printf("Teste de leitura e escrita de registradores concluído com sucesso!\n");
+    // Testar escrita e leitura de registradores
+
+    // Pulse 1
+    apu->writeRegister(0x4000, 0x3F);
+    TEST_ASSERT_EQUAL_UINT8(0x3F, apu->readRegister(0x4000));
+
+    // Pulse 2
+    apu->writeRegister(0x4004, 0x7F);
+    TEST_ASSERT_EQUAL_UINT8(0x7F, apu->readRegister(0x4004));
+
+    // Triangle
+    apu->writeRegister(0x4008, 0x81);
+    TEST_ASSERT_EQUAL_UINT8(0x81, apu->readRegister(0x4008));
+
+    // Noise
+    apu->writeRegister(0x400C, 0x30);
+    TEST_ASSERT_EQUAL_UINT8(0x30, apu->readRegister(0x400C));
+
+    // DMC
+    apu->writeRegister(0x4010, 0x0F);
+    TEST_ASSERT_EQUAL_UINT8(0x0F, apu->readRegister(0x4010));
 }
 
-/**
- * @brief Testa o tratamento de IRQ
- */
 void test_irq_handling(void)
 {
-    printf("Testando tratamento de IRQ...\n");
-    
-    // Configurar o APU para gerar IRQs
-    memory->write(0x4017, 0x00); // Habilitar IRQs
-    
+    // Configurar frame counter para gerar IRQ
+    apu->writeRegister(0x4017, 0x00); // Modo 4-step, IRQ habilitado
+
     // Executar ciclos suficientes para gerar um IRQ
-    apu->cycle(30000);
-    
+    for (int i = 0; i < 14915; i++)
+    { // Um frame completo
+        apu->cycle();
+    }
+
     // Verificar se o IRQ foi gerado
-    // Isso depende da implementação específica do APU
-    
-    printf("Teste de tratamento de IRQ concluído com sucesso!\n");
+    TEST_ASSERT_EQUAL(1, cpu->irq_triggered);
+
+    // Limpar IRQ
+    apu->writeRegister(0x4017, 0x40);
+    TEST_ASSERT_EQUAL(0, cpu->irq_triggered);
 }
 
-/**
- * @brief Testa a configuração da taxa de amostragem
- */
 void test_sample_rate_configuration(void)
 {
-    printf("Testando configuração da taxa de amostragem...\n");
-    
-    // Criar um novo APU com uma taxa de amostragem diferente
-    MegaEmu::Platforms::NES::NESAPU* test_apu = new MegaEmu::Platforms::NES::NESAPU(
-        static_cast<void*>(cpu),
-        static_cast<void*>(memory),
-        22050  // Taxa de amostragem diferente
-    );
-    
-    // Verificar se a taxa de amostragem foi configurada corretamente
-    // Isso depende da implementação específica do APU
-    
-    delete test_apu;
-    
-    printf("Teste de configuração da taxa de amostragem concluído com sucesso!\n");
+    // Testar diferentes taxas de amostragem
+    const int test_rates[] = {22050, 44100, 48000, 96000};
+
+    for (size_t i = 0; i < sizeof(test_rates) / sizeof(test_rates[0]); i++)
+    {
+        // Criar nova instância do APU com taxa de amostragem diferente
+        delete apu;
+        apu = new MegaEmu::Platforms::NES::NESAPU(
+            static_cast<void *>(cpu),
+            static_cast<void *>(memory),
+            test_rates[i]);
+
+        // Verificar se a taxa foi configurada corretamente
+        TEST_ASSERT_EQUAL(test_rates[i], apu->getSampleRate());
+
+        // Gerar algumas amostras para verificar se funciona
+        int samples = apu->generateSamples(test_buffer, 100);
+        TEST_ASSERT_EQUAL(100, samples);
+    }
 }
 
-/**
- * @brief Função principal para execução dos testes
- */
 int main(void)
 {
-    printf("Iniciando testes do APU do NES\n");
-    
-    // Executar testes
-    setup();
-    test_initialization();
-    teardown();
-    
-    setup();
-    test_cycle();
-    teardown();
-    
-    setup();
-    test_generate_samples();
-    teardown();
-    
-    setup();
-    test_register_read_write();
-    teardown();
-    
-    setup();
-    test_irq_handling();
-    teardown();
-    
-    setup();
-    test_sample_rate_configuration();
-    teardown();
-    
-    printf("Todos os testes do APU do NES concluídos com sucesso!\n");
-    
-    return 0;
+    UNITY_BEGIN();
+
+    RUN_TEST(test_initialization);
+    RUN_TEST(test_cycle);
+    RUN_TEST(test_generate_samples);
+    RUN_TEST(test_register_read_write);
+    RUN_TEST(test_irq_handling);
+    RUN_TEST(test_sample_rate_configuration);
+
+    return UNITY_END();
 }

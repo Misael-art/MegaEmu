@@ -1,1 +1,49 @@
-#ifndef GUI_SDL2_BACKEND_H#define GUI_SDL2_BACKEND_H#include <SDL2/SDL.h>#ifdef HAS_SDL2_TTF#include <SDL2/SDL_ttf.h>#endif#include "gui_types.h"// Initialization and shutdownbool sdl2_backend_init(const char *title, int width, int height);void sdl2_backend_shutdown(void);// Window managementSDL_Window *sdl2_backend_get_window(void);SDL_Renderer *sdl2_backend_get_renderer(void);#ifdef HAS_SDL2_TTFTTF_Font *sdl2_backend_get_font(void);#endif// Event handlingbool sdl2_backend_process_events(gui_event_t *event);// Rendering functionsvoid sdl2_backend_clear(void);void sdl2_backend_present(void);void sdl2_backend_render_texture(SDL_Texture *texture, const SDL_Rect *src, const SDL_Rect *dst);void sdl2_backend_render_rect(const SDL_Rect *rect, const SDL_Color *color);void sdl2_backend_render_text(const char *text, const SDL_Rect *dst, const SDL_Color *color);#endif // GUI_SDL2_BACKEND_H
+#ifndef GUI_SDL2_BACKEND_H
+#define GUI_SDL2_BACKEND_H
+
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
+#include <stdbool.h>
+#include "gui_types.h"
+
+// Estrutura de tamanho
+typedef struct gui_size_s
+{
+    int width;
+    int height;
+} gui_size_t;
+
+// Estrutura do backend SDL2
+typedef struct gui_sdl2_backend_s
+{
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    SDL_Texture *target;
+    gui_size_t window_size;
+    bool vsync_enabled;
+    float scale_factor;
+} gui_sdl2_backend_t;
+
+// Resultado das operações
+typedef gui_error_t gui_result_t;
+
+// Inicialização e finalização
+gui_result_t gui_sdl2_init(gui_sdl2_backend_t *backend, const char *title,
+                           gui_size_t size, bool vsync);
+void gui_sdl2_shutdown(gui_sdl2_backend_t *backend);
+
+// Funções de renderização
+gui_result_t gui_sdl2_begin_frame(gui_sdl2_backend_t *backend);
+gui_result_t gui_sdl2_end_frame(gui_sdl2_backend_t *backend);
+gui_result_t gui_sdl2_draw_rect(gui_sdl2_backend_t *backend,
+                                gui_rect_t rect, gui_color_t color);
+gui_result_t gui_sdl2_draw_text(gui_sdl2_backend_t *backend,
+                                const char *text, gui_point_t pos,
+                                gui_color_t color);
+
+// Processamento de eventos
+typedef gui_result_t (*gui_event_handler_t)(const gui_event_t *event, void *user_data);
+gui_result_t gui_sdl2_process_events(gui_sdl2_backend_t *backend,
+                                     gui_event_handler_t handler);
+
+#endif // GUI_SDL2_BACKEND_H

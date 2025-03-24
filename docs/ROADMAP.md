@@ -669,50 +669,71 @@ Processadores implementados e planejados:
 
 **Status Geral**: 55% implementado (↑5% desde a última atualização)
 
-#### 7.1.1 Componentes
+#### 7.1.1 Frontends Disponíveis
 
-| Componente | Status | Responsáveis | Descrição |
-|------------|--------|--------------|-----------|
-| Core UI Framework | 85% | @dev_team_ui | Framework base de UI cross-platform |
-| SDL Integration | 90% | @dev_team_ui | Integração com bibliotecas SDL para renderização |
-| Renderização Multiplatforma | 75% ↑ | @dev_team_ui | Adaptadores para diferentes sistemas operacionais |
-| Gerenciador de Temas | 40% | @dev_team_ui | Sistema de temas e personalização visual |
-| Acessibilidade | 25% | @dev_team_ui | Recursos para acessibilidade (alto contraste, leitor de tela) |
-| Input Management | 80% | @dev_team_ui | Sistema para gerenciamento de entrada em diferentes plataformas |
-| Electron Integration | 80% ↑ | @dev_team_electron | Integração com Electron para modo desktop |
+| Frontend | Status | Responsáveis | Descrição |
+|----------|--------|--------------|-----------|
+| SDL | 60% | @dev_team_sdl | Frontend baseado em SDL para máxima compatibilidade |
+| Qt | 55% | @dev_team_qt | Interface desktop moderna com Qt |
+| React/TypeScript | 55% ↑ | @dev_team_react | Novo frontend web moderno |
+| GUI (Compartilhado) | 60% | @dev_team_gui | Componentes GUI compartilhados |
 
-#### 7.1.2 Tarefas Pendentes Detalhadas (Frontend)
+#### 7.1.2 Status dos Componentes SDL
 
-1. **Core UI Framework**
-   - [x] ID-FE-CORE-001: Refatorar componentes reutilizáveis ✅
-   - [ ] ID-FE-CORE-002: Implementar sistema de layout responsivo 🔄
-   - [ ] ID-FE-CORE-003: Otimizar performance em interfaces complexas
+| Componente | Status | Descrição |
+|------------|--------|-----------|
+| Window | ✅ 100% | Gerenciamento de janelas |
+| Renderer | ✅ 100% | Sistema de renderização |
+| Input | ✅ 100% | Sistema de entrada |
+| Audio | 🚧 75% | Sistema de áudio |
+| Texture | 🚧 70% | Gerenciamento de texturas |
+| Events | 🚧 65% | Sistema de eventos |
+| Timing | 🚧 60% | Sistema de timing |
+| GUI | 🔌 30% | Interface gráfica |
+| Menu | 🔌 25% | Sistema de menus |
+| Config | 🔌 20% | Sistema de configuração |
 
-2. **Renderização Multiplatforma**
-   - [x] ID-FE-RENDER-001: Melhorar compatibilidade com OpenGL ES ✅
-   - [x] ID-FE-RENDER-002: Implementar fallbacks para hardware limitado ✅
-   - [ ] ID-FE-RENDER-003: Adicionar suporte a DirectX quando disponível
-   - [ ] ID-FE-RENDER-004: Otimizar renderização em dispositivos móveis
+#### 7.1.3 Status dos Componentes Qt
 
-3. **Gerenciador de Temas**
-   - [ ] ID-FE-THEME-001: Implementar sistema de temas completo
-   - [ ] ID-FE-THEME-002: Criar temas específicos para cada plataforma emulada
-   - [ ] ID-FE-THEME-003: Permitir personalização pelo usuário
-   - [ ] ID-FE-THEME-004: Implementar exportação/importação de temas
+| Componente | Status | Descrição |
+|------------|--------|-----------|
+| Window | ✅ 100% | Sistema de janelas |
+| Widgets | ✅ 95% | Componentes de interface |
+| Input | ✅ 90% | Sistema de entrada |
+| Audio | 🚧 70% | Sistema de áudio |
+| Rendering | 🚧 65% | Sistema de renderização |
+| Events | 🚧 60% | Sistema de eventos |
+| Timing | 🔌 35% | Sistema de timing |
+| GUI | 🔌 30% | Interface gráfica |
+| Menu | 🔌 25% | Sistema de menus |
+| Config | 🔌 20% | Sistema de configuração |
 
-4. **Acessibilidade**
-   - [ ] ID-FE-ACCESS-001: Implementar suporte a leitores de tela
-   - [ ] ID-FE-ACCESS-002: Adicionar modos de alto contraste
-   - [ ] ID-FE-ACCESS-003: Suporte a controles alternativos
-   - [ ] ID-FE-ACCESS-004: Testes com diferentes perfis de usuários
+#### 7.1.4 Status dos Componentes React/TypeScript
 
-5. **Integração Electron**
-   - [x] ID-FE-ELECTRON-001: Integração básica com Electron ✅
-   - [x] ID-FE-ELECTRON-002: Exposição segura de APIs nativas via preload ✅
-   - [x] ID-FE-ELECTRON-003: Correção de problemas de renderização ✅
-   - [x] ID-FE-ELECTRON-004: Otimização do processo de inicialização ✅
-   - [ ] ID-FE-ELECTRON-005: Implementação de menu nativo do sistema 🔄
-   - [ ] ID-FE-ELECTRON-006: Suporte a notificações nativas do sistema
+| Componente | Status | Descrição |
+|------------|--------|-----------|
+| Core UI Framework | 85% | Framework base de UI cross-platform |
+| SDL Integration | 90% | Integração com bibliotecas SDL |
+| Renderização Multiplatforma | 75% ↑ | Adaptadores para diferentes sistemas |
+| Input Management | 80% | Sistema para gerenciamento de entrada |
+| Electron Integration | 80% ↑ | Integração com Electron para desktop |
+| Gerenciador de Temas | 40% | Sistema de temas e personalização |
+| Acessibilidade | 25% | Recursos de acessibilidade |
+
+#### 7.1.5 Status dos Componentes GUI Compartilhados
+
+| Componente | Status | Descrição |
+|------------|--------|-----------|
+| Manager | ✅ 100% | Gerenciador de GUI |
+| Element | ✅ 95% | Elemento base |
+| Button | ✅ 90% | Componente de botão |
+| Label | 🚧 75% | Componente de texto |
+| TextBox | 🚧 70% | Campo de texto |
+| CheckBox | 🚧 65% | Caixa de seleção |
+| ComboBox | 🔌 30% | Lista suspensa |
+| ListBox | 🔌 25% | Lista de itens |
+| ScrollBar | 🔌 20% | Barra de rolagem |
+| Menu | 🔌 15% | Sistema de menus |
 
 ### 7.2 Interfaces Específicas de Plataforma
 
