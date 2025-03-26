@@ -1,22 +1,23 @@
 # CMakeLists.txt para o componente de cartuchos do NES
 
+cmake_minimum_required(VERSION 3.14)
+
 # Definir arquivos fonte C
-set(NES_CARTRIDGE_SOURCES
+set(CARTRIDGE_SOURCES
     nes_cartridge.c
-    mappers/mapper0.c
-    mappers/mapper1.c
-    mappers/mapper2.c
-    mappers/mapper3.c
-    mappers/mapper4.c
-    mappers/mapper5.c
-    mappers/mapper6.c
-    mappers/mapper7.c
-    mappers/mapper8.c
-    mappers/mapper9.c
-    mappers/mapper71.c
-    mappers/mapper90.c
-    mappers/mapper230.c
-    mappers/mapper255.c
+    nes_cartridge.h
+    mapper0.c
+    mapper0.h
+    mapper1.c
+    mapper1.h
+    # Arquivos C++ existentes
+    nes_cartridge.cpp
+    nes_cartridge.hpp
+    # Nova interface híbrida
+    nes_mapper.h
+    nes_mapper.cpp
+    cartridge.hpp
+    mapper.hpp
 )
 
 # Definir arquivos de cabeçalho
@@ -24,24 +25,46 @@ set(NES_CARTRIDGE_HEADERS
     nes_cartridge.h
 )
 
+# Subdiretório de mappers para implementações específicas
+add_subdirectory(mappers)
+
 # Criar biblioteca do cartridge
-add_library(nes_cartridge STATIC
-    ${NES_CARTRIDGE_SOURCES}
-    ${NES_CARTRIDGE_HEADERS}
+add_library(nes_cartridge STATIC ${CARTRIDGE_SOURCES})
+
+# Habilitar C++ 14 para recursos necessários
+set_target_properties(nes_cartridge PROPERTIES
+    CXX_STANDARD 14
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
 )
 
 # Definir includes
 target_include_directories(nes_cartridge PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/mappers
     ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/src/platforms/nes
+)
+
+# Definições para compilação
+target_compile_definitions(nes_cartridge PRIVATE
+    NES_CARTRIDGE_IMPLEMENTATION
 )
 
 # Linkar com outras bibliotecas
 target_link_libraries(nes_cartridge
-    nes_ppu
+    nes_core
     utils
 )
+
+# Adicionar flags de compilação específicas
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(nes_cartridge PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Wno-unused-parameter
+    )
+endif()
 
 # Exportar biblioteca
 set(NES_CARTRIDGE_LIBRARY nes_cartridge PARENT_SCOPE)

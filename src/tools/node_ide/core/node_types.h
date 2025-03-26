@@ -1,0 +1,1 @@
+#ifndef EMU_NODE_TYPES_H#define EMU_NODE_TYPES_H#include <stdint.h>#include "node_enums.h"#include "node_params.h"typedef struct{    uint32_t id;    char name[32];    emu_node_type_t type;    emu_node_params_t params;} EmuNode;typedef struct{    uint32_t from_node;    uint32_t to_node;    emu_connection_type_t type;} EmuNodeConnection;#endif // EMU_NODE_TYPES_H

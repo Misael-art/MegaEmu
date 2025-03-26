@@ -1,0 +1,1 @@
+#include <stdint.h>/** * @file docs.h * @brief Links para documentação atualizada */#define DOC_GETTING_STARTED "docs/user/GETTING_STARTED.md"#define DOC_API_REFERENCE  "docs/api/REFERENCE.md"#define DOC_METRICS       "docs/monitoring/METRICS.md"#define DOC_ARCHITECTURE  "docs/architecture/SYSTEM_OVERVIEW.md"

@@ -1,1 +1,2222 @@
-/** * @file m68k_instructions.c * @brief Implementação das instruções da CPU Motorola 68000 * * Este arquivo contém a implementação das funções para decodificação, * execução e manipulação de operandos para a CPU M68K do Mega Drive. */#include "m68k_instructions.h"#include "m68k.h"#include <stdio.h>#include <stdlib.h>/* Declarações de funções internas (privadas) */static int execute_move(const md_m68k_instruction_t *instruction);static int execute_nop(const md_m68k_instruction_t *instruction);static int execute_rts(const md_m68k_instruction_t *instruction);/* Declarações de funções internas adicionais */static int execute_add(const md_m68k_instruction_t *instruction);static int execute_sub(const md_m68k_instruction_t *instruction);static int execute_and(const md_m68k_instruction_t *instruction);static int execute_or(const md_m68k_instruction_t *instruction);static int execute_lsl(const md_m68k_instruction_t *instruction);static int execute_lsr(const md_m68k_instruction_t *instruction);static int execute_bra(const md_m68k_instruction_t *instruction);static int execute_bsr(const md_m68k_instruction_t *instruction);static int execute_bcc(const md_m68k_instruction_t *instruction);/* Adicionar novas declarações de funções internas */static int execute_muls(const md_m68k_instruction_t *instruction);static int execute_mulu(const md_m68k_instruction_t *instruction);static int execute_divs(const md_m68k_instruction_t *instruction);static int execute_divu(const md_m68k_instruction_t *instruction);static int execute_asl(const md_m68k_instruction_t *instruction);static int execute_asr(const md_m68k_instruction_t *instruction);static int execute_addx(const md_m68k_instruction_t *instruction);static int execute_subx(const md_m68k_instruction_t *instruction);static int execute_bchg(const md_m68k_instruction_t *instruction);static int execute_bclr(const md_m68k_instruction_t *instruction);static int execute_bset(const md_m68k_instruction_t *instruction);static int execute_btst(const md_m68k_instruction_t *instruction);static int execute_abcd(const md_m68k_instruction_t *instruction);static int execute_sbcd(const md_m68k_instruction_t *instruction);static int execute_cmpm(const md_m68k_instruction_t *instruction);static int execute_cmpa(const md_m68k_instruction_t *instruction);static int execute_ext(const md_m68k_instruction_t *instruction);static int execute_swap(const md_m68k_instruction_t *instruction);/** * @brief Decodifica uma instrução a partir do opcode * * @param opcode Opcode a ser decodificado * @param pc Endereço atual do contador de programa * @param instruction Ponteiro para a estrutura onde a instrução será armazenada * @return int Tamanho da instrução em bytes */int md_m68k_decode_instruction(uint16_t opcode, uint32_t pc, md_m68k_instruction_t *instruction){    // Inicializar a estrutura da instrução    instruction->opcode = opcode;    instruction->address = pc;    instruction->immediate = 0;    instruction->displacement = 0;    instruction->cycles_base = 0;    instruction->cycles_ea = 0;    instruction->condition = 0;    instruction->reg_mask = 0;    // Grupo de bits mais significativos do opcode    uint8_t group = (opcode >> 12) & 0xF;    // Verificar os grupos principais de instruções    switch (group)    {    case 0x1: // MOVE.B        instruction->type = M68K_INST_MOVE;        instruction->size = M68K_SIZE_BYTE;        instruction->dst_reg = (opcode >> 9) & 0x7;        instruction->dst_mode = ((opcode >> 6) & 0x7) + 1; // Ajustar para o enum        instruction->src_reg = opcode & 0x7;        instruction->src_mode = ((opcode >> 3) & 0x7) + 1; // Ajustar para o enum        instruction->cycles_base = 4;                      // Valor aproximado        return 2;                                          // Tamanho básico da instrução em bytes    case 0x3: // MOVE.W        instruction->type = M68K_INST_MOVE;        instruction->size = M68K_SIZE_WORD;        instruction->dst_reg = (opcode >> 9) & 0x7;        instruction->dst_mode = ((opcode >> 6) & 0x7) + 1; // Ajustar para o enum        instruction->src_reg = opcode & 0x7;        instruction->src_mode = ((opcode >> 3) & 0x7) + 1; // Ajustar para o enum        instruction->cycles_base = 4;                      // Valor aproximado        return 2;                                          // Tamanho básico da instrução em bytes    case 0x2: // MOVE.L        instruction->type = M68K_INST_MOVE;        instruction->size = M68K_SIZE_LONG;        instruction->dst_reg = (opcode >> 9) & 0x7;        instruction->dst_mode = ((opcode >> 6) & 0x7) + 1; // Ajustar para o enum        instruction->src_reg = opcode & 0x7;        instruction->src_mode = ((opcode >> 3) & 0x7) + 1; // Ajustar para o enum        instruction->cycles_base = 4;                      // Valor aproximado        return 2;                                          // Tamanho básico da instrução em bytes    case 0x4: // Misc (incluindo NOP)        if (opcode == 0x4E71)        {            instruction->type = M68K_INST_NOP;            instruction->size = M68K_SIZE_WORD;            instruction->src_mode = M68K_ADDR_MODE_IMPLIED;            instruction->dst_mode = M68K_ADDR_MODE_IMPLIED;            instruction->cycles_base = 4;            return 2;        }        else if (opcode == 0x4E75)        {            instruction->type = M68K_INST_RTS;            instruction->size = M68K_SIZE_WORD;            instruction->src_mode = M68K_ADDR_MODE_IMPLIED;            instruction->dst_mode = M68K_ADDR_MODE_IMPLIED;            instruction->cycles_base = 16;            return 2;        }        break;    case 0xD: // ADD, ADDX        if ((opcode & 0xF000) == 0xD000) {            instruction->type = M68K_INST_ADD;            instruction->size = (opcode & 0x00C0) >> 6;            instruction->dst_reg = (opcode >> 9) & 0x7;            instruction->src_reg = opcode & 0x7;            instruction->src_mode = ((opcode >> 3) & 0x7) + 1;            instruction->cycles_base = 4;            return 2;        }        break;    case 0x9: // SUB, SUBX        if ((opcode & 0xF000) == 0x9000) {            instruction->type = M68K_INST_SUB;            instruction->size = (opcode & 0x00C0) >> 6;            instruction->dst_reg = (opcode >> 9) & 0x7;            instruction->src_reg = opcode & 0x7;            instruction->src_mode = ((opcode >> 3) & 0x7) + 1;            instruction->cycles_base = 4;            return 2;        }        break;    case 0xC: // AND, MULU, MULS        if ((opcode & 0xF000) == 0xC000) {            instruction->type = M68K_INST_AND;            instruction->size = (opcode & 0x00C0) >> 6;            instruction->dst_reg = (opcode >> 9) & 0x7;            instruction->src_reg = opcode & 0x7;            instruction->src_mode = ((opcode >> 3) & 0x7) + 1;            instruction->cycles_base = 4;            return 2;        }        break;    case 0x8: // OR, DIVS, DIVU        if ((opcode & 0xF000) == 0x8000) {            instruction->type = M68K_INST_OR;            instruction->size = (opcode & 0x00C0) >> 6;            instruction->dst_reg = (opcode >> 9) & 0x7;            instruction->src_reg = opcode & 0x7;            instruction->src_mode = ((opcode >> 3) & 0x7) + 1;            instruction->cycles_base = 4;            return 2;        }        break;    case 0x6: // Bcc, BSR, BRA        {            uint8_t condition = (opcode >> 8) & 0xF;            int8_t displacement = (int8_t)(opcode & 0xFF);            if (condition == 0x0) { // BRA                instruction->type = M68K_INST_BRA;                instruction->displacement = displacement;                instruction->cycles_base = 10;                return 2;            }            else if (condition == 0x1) { // BSR                instruction->type = M68K_INST_BSR;                instruction->displacement = displacement;                instruction->cycles_base = 18;                return 2;            }            else { // Bcc                instruction->type = M68K_INST_BCC;                instruction->condition = condition;                instruction->displacement = displacement;                instruction->cycles_base = 10;                return 2;            }        }        break;    default:        // Instrução não implementada ou desconhecida        instruction->type = M68K_INST_INVALID;        instruction->size = M68K_SIZE_WORD;        instruction->src_mode = M68K_ADDR_MODE_INVALID;        instruction->dst_mode = M68K_ADDR_MODE_INVALID;        return 2; // Tamanho padrão    }    // Caso não reconheça a instrução    instruction->type = M68K_INST_INVALID;    return 2;}/** * @brief Executa uma instrução decodificada * * @param instruction Ponteiro para a instrução a ser executada * @return int Número de ciclos consumidos */int md_m68k_execute_instruction(const md_m68k_instruction_t *instruction){    int cycles = instruction->cycles_base;    // Executar a instrução de acordo com seu tipo    switch (instruction->type)    {    case M68K_INST_MOVE:        cycles += execute_move(instruction);        break;    case M68K_INST_NOP:        cycles += execute_nop(instruction);        break;    case M68K_INST_RTS:        cycles += execute_rts(instruction);        break;    case M68K_INST_ADD:        cycles += execute_add(instruction);        break;    case M68K_INST_SUB:        cycles += execute_sub(instruction);        break;    case M68K_INST_AND:        cycles += execute_and(instruction);        break;    case M68K_INST_OR:        cycles += execute_or(instruction);        break;    case M68K_INST_BRA:        cycles += execute_bra(instruction);        break;    case M68K_INST_BSR:        cycles += execute_bsr(instruction);        break;    case M68K_INST_BCC:        cycles += execute_bcc(instruction);        break;    default:        // Instrução não implementada        printf("AVISO: Instrução não implementada: %04X em %08X\n",               instruction->opcode, instruction->address);        break;    }    return cycles;}/** * @brief Lê o valor de um operando * * @param mode Modo de endereçamento * @param reg Registrador * @param size Tamanho da operação * @param value Ponteiro para onde o valor será armazenado * @return int Número de ciclos adicionais */int md_m68k_read_operand(md_m68k_addr_mode_t mode, uint8_t reg, md_m68k_size_t size, uint32_t *value){    int cycles = 0;    uint32_t addr;    switch (mode)    {    case M68K_ADDR_MODE_DATA_REG_DIRECT:        // Ler de um registrador de dados        if (size == M68K_SIZE_BYTE)            *value = (md_m68k_get_data_reg(reg) & 0xFF);        else if (size == M68K_SIZE_WORD)            *value = (md_m68k_get_data_reg(reg) & 0xFFFF);        else // M68K_SIZE_LONG            *value = md_m68k_get_data_reg(reg);        cycles = 0; // Não há ciclos adicionais para leitura de registrador        break;    case M68K_ADDR_MODE_ADDR_REG_DIRECT:        // Ler de um registrador de endereço        if (size == M68K_SIZE_BYTE)            *value = (md_m68k_get_addr_reg(reg) & 0xFF);        else if (size == M68K_SIZE_WORD)            *value = (md_m68k_get_addr_reg(reg) & 0xFFFF);        else // M68K_SIZE_LONG            *value = md_m68k_get_addr_reg(reg);        cycles = 0; // Não há ciclos adicionais para leitura de registrador        break;    case M68K_ADDR_MODE_ADDR_REG_INDIRECT:        // Ler da memória no endereço contido no registrador de endereço        {            addr = md_m68k_get_addr_reg(reg);            if (size == M68K_SIZE_BYTE)                *value = md_m68k_read_memory_8(addr);            else if (size == M68K_SIZE_WORD)                *value = md_m68k_read_memory_16(addr);            else // M68K_SIZE_LONG                *value = md_m68k_read_memory_32(addr);            cycles = 4; // Ciclos aproximados        }        break;    case M68K_ADDR_MODE_ADDR_REG_INDIRECT_POST:        // (An)+        addr = md_m68k_get_addr_reg(reg);        if (size == M68K_SIZE_BYTE)            *value = md_m68k_read_memory_8(addr);        else if (size == M68K_SIZE_WORD)            *value = md_m68k_read_memory_16(addr);        else // M68K_SIZE_LONG            *value = md_m68k_read_memory_32(addr);        // Pós-incrementar o registrador        md_m68k_set_addr_reg(reg, addr + (size == M68K_SIZE_BYTE ? 1 :                                         size == M68K_SIZE_WORD ? 2 : 4));        cycles = 4;        break;    case M68K_ADDR_MODE_ADDR_REG_INDIRECT_PRE:        // -(An)        addr = md_m68k_get_addr_reg(reg) - (size == M68K_SIZE_BYTE ? 1 :                                           size == M68K_SIZE_WORD ? 2 : 4);        md_m68k_set_addr_reg(reg, addr);        if (size == M68K_SIZE_BYTE)            *value = md_m68k_read_memory_8(addr);        else if (size == M68K_SIZE_WORD)            *value = md_m68k_read_memory_16(addr);        else // M68K_SIZE_LONG            *value = md_m68k_read_memory_32(addr);        cycles = 6;        break;    case M68K_ADDR_MODE_ADDR_REG_INDIRECT_DISP:        // (d16,An)        addr = md_m68k_get_addr_reg(reg) + (int16_t)instruction->displacement;        if (size == M68K_SIZE_BYTE)            *value = md_m68k_read_memory_8(addr);        else if (size == M68K_SIZE_WORD)            *value = md_m68k_read_memory_16(addr);        else // M68K_SIZE_LONG            *value = md_m68k_read_memory_32(addr);        cycles = 8;        break;    case M68K_ADDR_MODE_ABSOLUTE_SHORT:        // (xxx).W        addr = (int16_t)instruction->immediate;        if (size == M68K_SIZE_BYTE)            *value = md_m68k_read_memory_8(addr);        else if (size == M68K_SIZE_WORD)            *value = md_m68k_read_memory_16(addr);        else // M68K_SIZE_LONG            *value = md_m68k_read_memory_32(addr);        cycles = 8;        break;    case M68K_ADDR_MODE_ABSOLUTE_LONG:        // (xxx).L        addr = instruction->immediate;        if (size == M68K_SIZE_BYTE)            *value = md_m68k_read_memory_8(addr);        else if (size == M68K_SIZE_WORD)            *value = md_m68k_read_memory_16(addr);        else // M68K_SIZE_LONG            *value = md_m68k_read_memory_32(addr);        cycles = 12;        break;    case M68K_ADDR_MODE_IMMEDIATE:        // #<data>        *value = instruction->immediate;        cycles = 4;        break;    default:        // Modo de endereçamento não implementado        printf("AVISO: Modo de endereçamento não implementado para leitura: %d\n", mode);        *value = 0;        cycles = 4;        break;    }    return cycles;}/** * @brief Escreve um valor em um operando * * @param mode Modo de endereçamento * @param reg Registrador * @param size Tamanho da operação * @param value Valor a ser escrito * @return int Número de ciclos adicionais */int md_m68k_write_operand(md_m68k_addr_mode_t mode, uint8_t reg, md_m68k_size_t size, uint32_t value){    int cycles = 0;    uint32_t addr;    switch (mode)    {    case M68K_ADDR_MODE_DATA_REG_DIRECT:        // Escrever em um registrador de dados        if (size == M68K_SIZE_BYTE)            md_m68k_set_data_reg(reg, (md_m68k_get_data_reg(reg) & 0xFFFFFF00) | (value & 0xFF));        else if (size == M68K_SIZE_WORD)            md_m68k_set_data_reg(reg, (md_m68k_get_data_reg(reg) & 0xFFFF0000) | (value & 0xFFFF));        else // M68K_SIZE_LONG            md_m68k_set_data_reg(reg, value);        cycles = 0; // Não há ciclos adicionais para escrita em registrador        break;    case M68K_ADDR_MODE_ADDR_REG_DIRECT:        // Escrever em um registrador de endereço        if (size == M68K_SIZE_WORD)            md_m68k_set_addr_reg(reg, (int16_t)value); // Extensão de sinal para WORD        else                                           // M68K_SIZE_LONG            md_m68k_set_addr_reg(reg, value);        cycles = 0; // Não há ciclos adicionais para escrita em registrador        break;    case M68K_ADDR_MODE_ADDR_REG_INDIRECT:        // Escrever na memória no endereço contido no registrador de endereço        {            addr = md_m68k_get_addr_reg(reg);            if (size == M68K_SIZE_BYTE)                md_m68k_write_memory_8(addr, value & 0xFF);            else if (size == M68K_SIZE_WORD)                md_m68k_write_memory_16(addr, value & 0xFFFF);            else // M68K_SIZE_LONG                md_m68k_write_memory_32(addr, value);            cycles = 4; // Ciclos aproximados        }        break;    case M68K_ADDR_MODE_ADDR_REG_INDIRECT_POST:        // (An)+        addr = md_m68k_get_addr_reg(reg);        if (size == M68K_SIZE_BYTE)            md_m68k_write_memory_8(addr, value);        else if (size == M68K_SIZE_WORD)            md_m68k_write_memory_16(addr, value);        else // M68K_SIZE_LONG            md_m68k_write_memory_32(addr, value);        // Pós-incrementar o registrador        md_m68k_set_addr_reg(reg, addr + (size == M68K_SIZE_BYTE ? 1 :                                         size == M68K_SIZE_WORD ? 2 : 4));        cycles = 4;        break;    case M68K_ADDR_MODE_ADDR_REG_INDIRECT_PRE:        // -(An)        addr = md_m68k_get_addr_reg(reg) - (size == M68K_SIZE_BYTE ? 1 :                                           size == M68K_SIZE_WORD ? 2 : 4);        md_m68k_set_addr_reg(reg, addr);        if (size == M68K_SIZE_BYTE)            md_m68k_write_memory_8(addr, value);        else if (size == M68K_SIZE_WORD)            md_m68k_write_memory_16(addr, value);        else // M68K_SIZE_LONG            md_m68k_write_memory_32(addr, value);        cycles = 6;        break;    case M68K_ADDR_MODE_ADDR_REG_INDIRECT_DISP:        // (d16,An)        addr = md_m68k_get_addr_reg(reg) + (int16_t)instruction->displacement;        if (size == M68K_SIZE_BYTE)            md_m68k_write_memory_8(addr, value);        else if (size == M68K_SIZE_WORD)            md_m68k_write_memory_16(addr, value);        else // M68K_SIZE_LONG            md_m68k_write_memory_32(addr, value);        cycles = 8;        break;    case M68K_ADDR_MODE_ABSOLUTE_SHORT:        // (xxx).W        addr = (int16_t)instruction->immediate;        if (size == M68K_SIZE_BYTE)            md_m68k_write_memory_8(addr, value);        else if (size == M68K_SIZE_WORD)            md_m68k_write_memory_16(addr, value);        else // M68K_SIZE_LONG            md_m68k_write_memory_32(addr, value);        cycles = 8;        break;    case M68K_ADDR_MODE_ABSOLUTE_LONG:        // (xxx).L        addr = instruction->immediate;        if (size == M68K_SIZE_BYTE)            md_m68k_write_memory_8(addr, value);        else if (size == M68K_SIZE_WORD)            md_m68k_write_memory_16(addr, value);        else // M68K_SIZE_LONG            md_m68k_write_memory_32(addr, value);        cycles = 12;        break;    case M68K_ADDR_MODE_IMMEDIATE:        // #<data>        cycles = 4;        break;    default:        // Modo de endereçamento não implementado        printf("AVISO: Modo de endereçamento não implementado para escrita: %d\n", mode);        cycles = 4;        break;    }    return cycles;}/** * @brief Atualiza as flags com base no resultado de uma operação * * @param result Resultado da operação * @param size Tamanho da operação * @param update_mask Máscara indicando quais flags devem ser atualizadas */void md_m68k_update_flags(uint32_t result, md_m68k_size_t size, uint16_t update_mask){    uint16_t ccr = md_m68k_get_sr() & 0xFF;    uint32_t mask;    // Determinar a máscara com base no tamanho    if (size == M68K_SIZE_BYTE)        mask = 0xFF;    else if (size == M68K_SIZE_WORD)        mask = 0xFFFF;    else // M68K_SIZE_LONG        mask = 0xFFFFFFFF;    // Atualizar cada flag se necessário    if (update_mask & 0x01)    { // N - Negative        if (result & (mask >> 1) + 1)            ccr |= 0x08;        else            ccr &= ~0x08;    }    if (update_mask & 0x02)    { // Z - Zero        if ((result & mask) == 0)            ccr |= 0x04;        else            ccr &= ~0x04;    }    if (update_mask & 0x04)    { // V - Overflow (simplificado)        // Normalmente calculado durante a instrução específica        ccr &= ~0x02;    }    if (update_mask & 0x08)    { // C - Carry (simplificado)        // Normalmente calculado durante a instrução específica        ccr &= ~0x01;    }    // Atualizar o registrador de status    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);}/** * @brief Avalia uma condição com base nas flags do processador * * @param condition Código da condição a ser avaliada * @return int 1 se a condição for verdadeira, 0 caso contrário */int md_m68k_evaluate_condition(uint8_t condition){    uint16_t sr = md_m68k_get_sr();    int n = (sr >> 3) & 1; // Negative flag    int z = (sr >> 2) & 1; // Zero flag    int v = (sr >> 1) & 1; // Overflow flag    int c = sr & 1;        // Carry flag    switch (condition)    {    case 0x0:        return 1; // T - True    case 0x1:        return 0; // F - False    case 0x2:        return !c && !z; // HI - High    case 0x3:        return c || z; // LS - Low or Same    case 0x4:        return !c; // CC/HS - Carry Clear/Higher or Same    case 0x5:        return c; // CS/LO - Carry Set/Lower    case 0x6:        return !z; // NE - Not Equal    case 0x7:        return z; // EQ - Equal    case 0x8:        return !v; // VC - Overflow Clear    case 0x9:        return v; // VS - Overflow Set    case 0xA:        return !n; // PL - Plus    case 0xB:        return n; // MI - Minus    case 0xC:        return n == v; // GE - Greater or Equal    case 0xD:        return n != v; // LT - Less Than    case 0xE:        return !z && (n == v); // GT - Greater Than    case 0xF:        return z || (n != v); // LE - Less or Equal    default:        return 0;    }}/* Implementações de instruções específicas *//** * @brief Executa a instrução MOVE * * @param instruction Ponteiro para a instrução * @return int Ciclos adicionais */static int execute_move(const md_m68k_instruction_t *instruction){    uint32_t value;    int cycles = 0;    // Ler o valor da fonte    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                   instruction->size, &value);    // Escrever o valor no destino    cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,                                    instruction->size, value);    // Atualizar as flags N, Z, V e C    md_m68k_update_flags(value, instruction->size, 0x0F);    return cycles;}/** * @brief Executa a instrução NOP * * @param instruction Ponteiro para a instrução * @return int Ciclos adicionais */static int execute_nop(const md_m68k_instruction_t *instruction){    // NOP não faz nada    (void)instruction; // Evitar warning de parâmetro não utilizado    return 0;}/** * @brief Executa a instrução RTS * * @param instruction Ponteiro para a instrução * @return int Ciclos adicionais */static int execute_rts(const md_m68k_instruction_t *instruction){    (void)instruction; // Evitar warning de parâmetro não utilizado    // Recuperar o endereço de retorno da pilha    uint32_t sp = md_m68k_get_addr_reg(7); // A7 = SP    uint32_t ret_addr = md_m68k_read_memory_32(sp);    // Atualizar o SP    md_m68k_set_addr_reg(7, sp + 4);    // Atualizar o PC    md_m68k_set_pc(ret_addr);    return 0;}/** * @brief Executa a instrução ADD */static int execute_add(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value, result;    int cycles = 0;    // Ler operando fonte    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  instruction->size, &src_value);    // Ler operando destino    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  instruction->size, &dst_value);    // Realizar a adição    result = dst_value + src_value;    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   instruction->size, result);    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // N - Negative    if (result & (1 << (instruction->size * 8 - 1)))        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero    if ((result & ((1 << (instruction->size * 8)) - 1)) == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // V - Overflow (simplificado)    if ((src_value & dst_value & ~result & 0x80000000) ||        (~src_value & ~dst_value & result & 0x80000000))        ccr |= 0x02;    else        ccr &= ~0x02;    // C - Carry    if (result < src_value || result < dst_value)        ccr |= 0x01;    else        ccr &= ~0x01;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles;}/** * @brief Executa a instrução SUB */static int execute_sub(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value, result;    int cycles = 0;    // Ler operando fonte    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  instruction->size, &src_value);    // Ler operando destino    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  instruction->size, &dst_value);    // Realizar a subtração    result = dst_value - src_value;    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   instruction->size, result);    // Atualizar flags (similar ao ADD)    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // N - Negative    if (result & (1 << (instruction->size * 8 - 1)))        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero    if ((result & ((1 << (instruction->size * 8)) - 1)) == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // V - Overflow (simplificado)    if ((src_value & ~dst_value & ~result & 0x80000000) ||        (~src_value & dst_value & result & 0x80000000))        ccr |= 0x02;    else        ccr &= ~0x02;    // C - Carry    if (src_value > dst_value)        ccr |= 0x01;    else        ccr &= ~0x01;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles;}/** * @brief Executa a instrução AND */static int execute_and(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value, result;    int cycles = 0;    // Ler operandos    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  instruction->size, &src_value);    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  instruction->size, &dst_value);    // Realizar AND    result = dst_value & src_value;    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   instruction->size, result);    // Atualizar flags N e Z    md_m68k_update_flags(result, instruction->size, 0x0C);    return cycles;}/** * @brief Executa a instrução OR */static int execute_or(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value, result;    int cycles = 0;    // Ler operandos    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  instruction->size, &src_value);    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  instruction->size, &dst_value);    // Realizar OR    result = dst_value | src_value;    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   instruction->size, result);    // Atualizar flags N e Z    md_m68k_update_flags(result, instruction->size, 0x0C);    return cycles;}/** * @brief Executa a instrução BRA (Branch Always) */static int execute_bra(const md_m68k_instruction_t *instruction) {    // Calcular o endereço de destino    int32_t displacement = (int8_t)instruction->displacement;    uint32_t target = md_m68k_get_pc() + displacement;    // Atualizar PC    md_m68k_set_pc(target);    return 0;}/** * @brief Executa a instrução BSR (Branch to Subroutine) */static int execute_bsr(const md_m68k_instruction_t *instruction) {    int cycles = 0;    uint32_t return_addr = md_m68k_get_pc();    // Empilhar endereço de retorno    uint32_t sp = md_m68k_get_addr_reg(7) - 4;    md_m68k_set_addr_reg(7, sp);    md_m68k_write_memory_32(sp, return_addr);    cycles += 8; // Ciclos para escrita na pilha    // Calcular e saltar para o endereço de destino    int32_t displacement = (int8_t)instruction->displacement;    uint32_t target = md_m68k_get_pc() + displacement;    md_m68k_set_pc(target);    return cycles;}/** * @brief Executa a instrução Bcc (Branch Conditionally) */static int execute_bcc(const md_m68k_instruction_t *instruction) {    // Avaliar a condição    if (md_m68k_evaluate_condition(instruction->condition)) {        // Condição verdadeira - realizar o branch        int32_t displacement = (int8_t)instruction->displacement;        uint32_t target = md_m68k_get_pc() + displacement;        md_m68k_set_pc(target);        return 0; // Ciclos já incluídos no cycles_base    }    return -4; // Subtrair ciclos se o branch não for tomado}/** * @brief Executa a instrução MULS (Multiply Signed) */static int execute_muls(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value;    int cycles = 0;    // Ler operandos    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  M68K_SIZE_WORD, &src_value);    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  M68K_SIZE_WORD, &dst_value);    // Realizar multiplicação com sinal    int32_t result = (int16_t)src_value * (int16_t)dst_value;    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   M68K_SIZE_LONG, result);    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // N - Negative    if (result < 0)        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero    if (result == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // V, C são sempre zerados    ccr &= ~0x03;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 70; // Ciclos base para multiplicação}/** * @brief Executa a instrução MULU (Multiply Unsigned) */static int execute_mulu(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value;    int cycles = 0;    // Ler operandos    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  M68K_SIZE_WORD, &src_value);    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  M68K_SIZE_WORD, &dst_value);    // Realizar multiplicação sem sinal    uint32_t result = (uint16_t)src_value * (uint16_t)dst_value;    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   M68K_SIZE_LONG, result);    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // N - Negative    if (result & 0x80000000)        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero    if (result == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // V, C são sempre zerados    ccr &= ~0x03;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 70; // Ciclos base para multiplicação}/** * @brief Executa a instrução LSL (Logical Shift Left) */static int execute_lsl(const md_m68k_instruction_t *instruction) {    uint32_t value, count;    int cycles = 0;    // Obter o valor a ser deslocado    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  instruction->size, &value);    // Obter contagem de deslocamento    if (instruction->src_mode == M68K_ADDR_MODE_IMMEDIATE)        count = instruction->immediate & 0x3F; // Máximo 63 posições    else        count = md_m68k_get_data_reg(instruction->src_reg) & 0x3F;    // Realizar deslocamento    uint32_t result = value << count;    uint32_t mask = (instruction->size == M68K_SIZE_BYTE ? 0xFF :                     instruction->size == M68K_SIZE_WORD ? 0xFFFF : 0xFFFFFFFF);    result &= mask;    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   instruction->size, result);    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // N - Negative    if (result & (1 << (instruction->size * 8 - 1)))        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero    if (result == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // X, C - Último bit deslocado para fora    if (count > 0 && (value & (1 << (instruction->size * 8 - count))))        ccr |= 0x11;    else        ccr &= ~0x11;    // V é sempre zerado    ccr &= ~0x02;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + (count * 2); // 2 ciclos por posição}/** * @brief Executa a instrução LSR (Logical Shift Right) */static int execute_lsr(const md_m68k_instruction_t *instruction) {    uint32_t value, count;    int cycles = 0;    // Obter o valor a ser deslocado    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  instruction->size, &value);    // Obter contagem de deslocamento    if (instruction->src_mode == M68K_ADDR_MODE_IMMEDIATE)        count = instruction->immediate & 0x3F;    else        count = md_m68k_get_data_reg(instruction->src_reg) & 0x3F;    // Realizar deslocamento    uint32_t result = value >> count;    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   instruction->size, result);    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // N é sempre zerado    ccr &= ~0x08;    // Z - Zero    if (result == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // X, C - Último bit deslocado para fora    if (count > 0 && (value & (1 << (count - 1))))        ccr |= 0x11;    else        ccr &= ~0x11;    // V é sempre zerado    ccr &= ~0x02;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + (count * 2); // 2 ciclos por posição}/** * @brief Executa a instrução DIVS (Divide Signed) */static int execute_divs(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value;    int cycles = 0;    // Ler operandos    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  M68K_SIZE_WORD, &src_value);    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  M68K_SIZE_LONG, &dst_value);    // Converter para valores com sinal    int32_t dividend = (int32_t)dst_value;    int16_t divisor = (int16_t)src_value;    // Verificar divisão por zero    if (divisor == 0) {        // Gerar trap de divisão por zero        printf("ERRO: Divisão por zero em DIVS\n");        return cycles + 8;    }    // Realizar divisão    int32_t quotient = dividend / divisor;    int16_t remainder = dividend % divisor;    // Verificar overflow    if (quotient > 32767 || quotient < -32768) {        // Overflow - setar flag V e não armazenar resultado        uint16_t ccr = md_m68k_get_sr() & 0xFF;        ccr |= 0x02; // Set V        md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);        return cycles + 8;    }    // Combinar quociente e resto    uint32_t result = ((uint32_t)(remainder & 0xFFFF) << 16) | (quotient & 0xFFFF);    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   M68K_SIZE_LONG, result);    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // N - Negative    if (quotient < 0)        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero    if (quotient == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // V, C são zerados    ccr &= ~0x03;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 158; // Ciclos base para divisão}/** * @brief Executa a instrução DIVU (Divide Unsigned) */static int execute_divu(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value;    int cycles = 0;    // Ler operandos    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  M68K_SIZE_WORD, &src_value);    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  M68K_SIZE_LONG, &dst_value);    // Verificar divisão por zero    if (src_value == 0) {        // Gerar trap de divisão por zero        printf("ERRO: Divisão por zero em DIVU\n");        return cycles + 8;    }    // Realizar divisão sem sinal    uint32_t quotient = dst_value / src_value;    uint16_t remainder = dst_value % src_value;    // Verificar overflow    if (quotient > 0xFFFF) {        // Overflow - setar flag V e não armazenar resultado        uint16_t ccr = md_m68k_get_sr() & 0xFF;        ccr |= 0x02; // Set V        md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);        return cycles + 8;    }    // Combinar quociente e resto    uint32_t result = ((uint32_t)remainder << 16) | (quotient & 0xFFFF);    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   M68K_SIZE_LONG, result);    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // N - Negative    if (quotient & 0x8000)        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero    if ((quotient & 0xFFFF) == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // V, C são zerados    ccr &= ~0x03;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 140; // Ciclos base para divisão}/** * @brief Executa a instrução ASL (Arithmetic Shift Left) */static int execute_asl(const md_m68k_instruction_t *instruction) {    uint32_t value, count;    int cycles = 0;    // Obter o valor a ser deslocado    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  instruction->size, &value);    // Obter contagem de deslocamento    if (instruction->src_mode == M68K_ADDR_MODE_IMMEDIATE)        count = instruction->immediate & 0x3F; // Máximo 63 posições    else        count = md_m68k_get_data_reg(instruction->src_reg) & 0x3F;    // Realizar deslocamento    uint32_t result = value;    uint32_t msb_mask = 1 << (instruction->size * 8 - 1);    uint32_t old_msb = result & msb_mask;    uint32_t mask = (instruction->size == M68K_SIZE_BYTE ? 0xFF :                     instruction->size == M68K_SIZE_WORD ? 0xFFFF : 0xFFFFFFFF);    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    ccr &= ~0x1F; // Limpar X,N,Z,V,C    if (count > 0) {        result = (result << count) & mask;        // X,C - Último bit deslocado para fora        if (value & (1 << (instruction->size * 8 - count)))            ccr |= 0x11;        // N - Negative        if (result & msb_mask)            ccr |= 0x08;        // Z - Zero        if ((result & mask) == 0)            ccr |= 0x04;        // V - Set se o bit de sinal mudou durante o deslocamento        uint32_t new_msb = result & msb_mask;        if (old_msb != new_msb)            ccr |= 0x02;    }    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   instruction->size, result);    return cycles + (count * 2); // 2 ciclos por posição}/** * @brief Executa a instrução ASR (Arithmetic Shift Right) */static int execute_asr(const md_m68k_instruction_t *instruction) {    uint32_t value, count;    int cycles = 0;    // Obter o valor a ser deslocado    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  instruction->size, &value);    // Obter contagem de deslocamento    if (instruction->src_mode == M68K_ADDR_MODE_IMMEDIATE)        count = instruction->immediate & 0x3F;    else        count = md_m68k_get_data_reg(instruction->src_reg) & 0x3F;    // Realizar deslocamento    uint32_t result = value;    uint32_t msb_mask = 1 << (instruction->size * 8 - 1);    uint32_t msb = result & msb_mask;    uint32_t mask = (instruction->size == M68K_SIZE_BYTE ? 0xFF :                     instruction->size == M68K_SIZE_WORD ? 0xFFFF : 0xFFFFFFFF);    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    ccr &= ~0x1F; // Limpar X,N,Z,V,C    if (count > 0) {        // Deslocamento aritmético mantém o bit de sinal        for (uint32_t i = 0; i < count; i++) {            // X,C recebem o último bit deslocado para fora            if (result & 1)                ccr |= 0x11;            else                ccr &= ~0x11;            result = (result >> 1) & mask;            if (msb) // Replicar o bit de sinal                result |= msb;        }        // N - Negative (mantido do bit de sinal original)        if (msb)            ccr |= 0x08;        // Z - Zero        if ((result & mask) == 0)            ccr |= 0x04;        // V é sempre zerado em ASR        ccr &= ~0x02;    }    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   instruction->size, result);    return cycles + (count * 2); // 2 ciclos por posição}/** * @brief Executa a instrução ADDX (Add with Extend) */static int execute_addx(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value, result;    int cycles = 0;    // Ler operandos    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  instruction->size, &src_value);    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  instruction->size, &dst_value);    // Obter X flag    uint16_t sr = md_m68k_get_sr();    int x_flag = (sr & 0x10) ? 1 : 0;    // Realizar adição com extensão    result = dst_value + src_value + x_flag;    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   instruction->size, result);    // Atualizar flags    uint16_t ccr = sr & 0xFF;    uint32_t mask = (instruction->size == M68K_SIZE_BYTE ? 0xFF :                     instruction->size == M68K_SIZE_WORD ? 0xFFFF : 0xFFFFFFFF);    // N - Negative    if (result & (1 << (instruction->size * 8 - 1)))        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero (não é limpo se o resultado é diferente de zero)    if ((result & mask) == 0)        ccr |= 0x04;    // V - Overflow    if ((src_value & dst_value & ~result & 0x80000000) ||        (~src_value & ~dst_value & result & 0x80000000))        ccr |= 0x02;    else        ccr &= ~0x02;    // C,X - Carry e Extend    if (result < src_value || (result == src_value && x_flag))        ccr |= 0x11;    else        ccr &= ~0x11;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 4;}/** * @brief Executa a instrução SUBX (Subtract with Extend) */static int execute_subx(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value, result;    int cycles = 0;    // Ler operandos    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  instruction->size, &src_value);    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  instruction->size, &dst_value);    // Obter X flag    uint16_t sr = md_m68k_get_sr();    int x_flag = (sr & 0x10) ? 1 : 0;    // Realizar subtração com extensão    result = dst_value - src_value - x_flag;    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   instruction->size, result);    // Atualizar flags    uint16_t ccr = sr & 0xFF;    uint32_t mask = (instruction->size == M68K_SIZE_BYTE ? 0xFF :                     instruction->size == M68K_SIZE_WORD ? 0xFFFF : 0xFFFFFFFF);    // N - Negative    if (result & (1 << (instruction->size * 8 - 1)))        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero (não é limpo se o resultado é diferente de zero)    if ((result & mask) == 0)        ccr |= 0x04;    // V - Overflow    if ((src_value & ~dst_value & ~result & 0x80000000) ||        (~src_value & dst_value & result & 0x80000000))        ccr |= 0x02;    else        ccr &= ~0x02;    // C,X - Carry e Extend    if (src_value + x_flag > dst_value)        ccr |= 0x11;    else        ccr &= ~0x11;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 4;}/** * @brief Executa a instrução BCHG (Test a Bit and Change) */static int execute_bchg(const md_m68k_instruction_t *instruction) {    uint32_t value;    int cycles = 0;    // Ler operando    cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,                                  instruction->size, &value);    // Obter número do bit    uint8_t bit_num;    if (instruction->src_mode == M68K_ADDR_MODE_IMMEDIATE)        bit_num = instruction->immediate & 0x1F;    else        bit_num = md_m68k_get_data_reg(instruction->src_reg) & 0x1F;    // Testar bit    uint32_t bit_mask = 1 << bit_num;    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // Z - Zero (setado se o bit era zero)    if (!(value & bit_mask))        ccr |= 0x04;    else        ccr &= ~0x04;    // Inverter o bit    value ^= bit_mask;    // Escrever resultado    cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,                                   instruction->size, value);    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 8;}/** * @brief Executa a instrução BCLR (Test a Bit and Clear) */static int execute_bclr(const md_m68k_instruction_t *instruction) {    uint32_t value;    int cycles = 0;    // Ler operando    cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,                                  instruction->size, &value);    // Obter número do bit    uint8_t bit_num;    if (instruction->src_mode == M68K_ADDR_MODE_IMMEDIATE)        bit_num = instruction->immediate & 0x1F;    else        bit_num = md_m68k_get_data_reg(instruction->src_reg) & 0x1F;    // Testar bit    uint32_t bit_mask = 1 << bit_num;    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // Z - Zero (setado se o bit era zero)    if (!(value & bit_mask))        ccr |= 0x04;    else        ccr &= ~0x04;    // Limpar o bit    value &= ~bit_mask;    // Escrever resultado    cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,                                   instruction->size, value);    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 8;}/** * @brief Executa a instrução BSET (Test a Bit and Set) */static int execute_bset(const md_m68k_instruction_t *instruction) {    uint32_t value;    int cycles = 0;    // Ler operando    cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,                                  instruction->size, &value);    // Obter número do bit    uint8_t bit_num;    if (instruction->src_mode == M68K_ADDR_MODE_IMMEDIATE)        bit_num = instruction->immediate & 0x1F;    else        bit_num = md_m68k_get_data_reg(instruction->src_reg) & 0x1F;    // Testar bit    uint32_t bit_mask = 1 << bit_num;    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // Z - Zero (setado se o bit era zero)    if (!(value & bit_mask))        ccr |= 0x04;    else        ccr &= ~0x04;    // Setar o bit    value |= bit_mask;    // Escrever resultado    cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,                                   instruction->size, value);    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 8;}/** * @brief Executa a instrução BTST (Test a Bit) */static int execute_btst(const md_m68k_instruction_t *instruction) {    uint32_t value;    int cycles = 0;    // Ler operando    cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,                                  instruction->size, &value);    // Obter número do bit    uint8_t bit_num;    if (instruction->src_mode == M68K_ADDR_MODE_IMMEDIATE)        bit_num = instruction->immediate & 0x1F;    else        bit_num = md_m68k_get_data_reg(instruction->src_reg) & 0x1F;    // Testar bit    uint32_t bit_mask = 1 << bit_num;    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // Z - Zero (setado se o bit é zero)    if (!(value & bit_mask))        ccr |= 0x04;    else        ccr &= ~0x04;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 4;}/** * @brief Executa a instrução ABCD (Add Decimal with Extend) */static int execute_abcd(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value;    int cycles = 0;    // Ler operandos    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  M68K_SIZE_BYTE, &src_value);    cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,                                  M68K_SIZE_BYTE, &dst_value);    // Obter X flag    uint16_t sr = md_m68k_get_sr();    int x_flag = (sr & 0x10) ? 1 : 0;    // Realizar adição BCD    uint8_t src_lo = src_value & 0x0F;    uint8_t src_hi = (src_value >> 4) & 0x0F;    uint8_t dst_lo = dst_value & 0x0F;    uint8_t dst_hi = (dst_value >> 4) & 0x0F;    // Adicionar dígitos menos significativos    int temp = dst_lo + src_lo + x_flag;    uint8_t result_lo = temp % 10;    int carry = temp >= 10 ? 1 : 0;    // Adicionar dígitos mais significativos    temp = dst_hi + src_hi + carry;    uint8_t result_hi = temp % 10;    carry = temp >= 10 ? 1 : 0;    // Combinar resultado    uint8_t result = (result_hi << 4) | result_lo;    // Escrever resultado    cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,                                   M68K_SIZE_BYTE, result);    // Atualizar flags    uint16_t ccr = sr & 0xFF;    // Z - Zero (não é limpo se o resultado é diferente de zero)    if (result == 0)        ccr |= 0x04;    // C,X - Carry e Extend    if (carry)        ccr |= 0x11;    else        ccr &= ~0x11;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 6;}/** * @brief Executa a instrução SBCD (Subtract Decimal with Extend) */static int execute_sbcd(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value;    int cycles = 0;    // Ler operandos    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  M68K_SIZE_BYTE, &src_value);    cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,                                  M68K_SIZE_BYTE, &dst_value);    // Obter X flag    uint16_t sr = md_m68k_get_sr();    int x_flag = (sr & 0x10) ? 1 : 0;    // Realizar subtração BCD    uint8_t src_lo = src_value & 0x0F;    uint8_t src_hi = (src_value >> 4) & 0x0F;    uint8_t dst_lo = dst_value & 0x0F;    uint8_t dst_hi = (dst_value >> 4) & 0x0F;    // Subtrair dígitos menos significativos    int borrow = 0;    int temp = dst_lo - src_lo - x_flag;    uint8_t result_lo;    if (temp < 0) {        temp += 10;        borrow = 1;    }    result_lo = temp;    // Subtrair dígitos mais significativos    temp = dst_hi - src_hi - borrow;    uint8_t result_hi;    if (temp < 0) {        temp += 10;        borrow = 1;    } else {        borrow = 0;    }    result_hi = temp;    // Combinar resultado    uint8_t result = (result_hi << 4) | result_lo;    // Escrever resultado    cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,                                   M68K_SIZE_BYTE, result);    // Atualizar flags    uint16_t ccr = sr & 0xFF;    // Z - Zero (não é limpo se o resultado é diferente de zero)    if (result == 0)        ccr |= 0x04;    // C,X - Carry e Extend    if (borrow)        ccr |= 0x11;    else        ccr &= ~0x11;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 6;}/** * @brief Executa a instrução CMPM (Compare Memory) */static int execute_cmpm(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value;    int cycles = 0;    // Ler operandos (pós-incremento)    cycles += md_m68k_read_operand(M68K_ADDR_MODE_ADDR_REG_INDIRECT_POST, instruction->src_reg,                                  instruction->size, &src_value);    cycles += md_m68k_read_operand(M68K_ADDR_MODE_ADDR_REG_INDIRECT_POST, instruction->dst_reg,                                  instruction->size, &dst_value);    // Realizar comparação (subtração sem armazenar resultado)    uint32_t result = dst_value - src_value;    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    uint32_t mask = (instruction->size == M68K_SIZE_BYTE ? 0xFF :                     instruction->size == M68K_SIZE_WORD ? 0xFFFF : 0xFFFFFFFF);    // N - Negative    if (result & (1 << (instruction->size * 8 - 1)))        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero    if ((result & mask) == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // V - Overflow    if ((src_value & ~dst_value & ~result & 0x80000000) ||        (~src_value & dst_value & result & 0x80000000))        ccr |= 0x02;    else        ccr &= ~0x02;    // C - Carry    if (src_value > dst_value)        ccr |= 0x01;    else        ccr &= ~0x01;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 12;}/** * @brief Executa a instrução CMPA (Compare Address) */static int execute_cmpa(const md_m68k_instruction_t *instruction) {    uint32_t src_value, dst_value;    int cycles = 0;    // Ler operandos    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,                                  instruction->size, &src_value);    cycles += md_m68k_read_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT, instruction->dst_reg,                                  M68K_SIZE_LONG, &dst_value);    // Extensão de sinal para o operando fonte se necessário    if (instruction->size == M68K_SIZE_WORD)        src_value = (int16_t)src_value;    // Realizar comparação (subtração sem armazenar resultado)    uint32_t result = dst_value - src_value;    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // N - Negative    if (result & 0x80000000)        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero    if (result == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // V - Overflow    if ((src_value & ~dst_value & ~result & 0x80000000) ||        (~src_value & dst_value & result & 0x80000000))        ccr |= 0x02;    else        ccr &= ~0x02;    // C - Carry    if (src_value > dst_value)        ccr |= 0x01;    else        ccr &= ~0x01;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 6;}/** * @brief Executa a instrução EXT (Sign Extend) */static int execute_ext(const md_m68k_instruction_t *instruction) {    uint32_t value;    int cycles = 0;    // Ler operando    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  instruction->size == M68K_SIZE_WORD ? M68K_SIZE_BYTE : M68K_SIZE_WORD,                                  &value);    // Realizar extensão de sinal    if (instruction->size == M68K_SIZE_WORD) {        // Byte para Word        value = (int8_t)value;    } else {        // Word para Long        value = (int16_t)value;    }    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   instruction->size, value);    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // N - Negative    if (value & (instruction->size == M68K_SIZE_WORD ? 0x8000 : 0x80000000))        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero    if (value == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // V,C são sempre zerados    ccr &= ~0x03;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 4;}/** * @brief Executa a instrução SWAP (Swap Register Halves) */static int execute_swap(const md_m68k_instruction_t *instruction) {    uint32_t value;    int cycles = 0;    // Ler operando    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                  M68K_SIZE_LONG, &value);    // Trocar words    value = ((value & 0xFFFF) << 16) | ((value >> 16) & 0xFFFF);    // Escrever resultado    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,                                   M68K_SIZE_LONG, value);    // Atualizar flags    uint16_t ccr = md_m68k_get_sr() & 0xFF;    // N - Negative    if (value & 0x80000000)        ccr |= 0x08;    else        ccr &= ~0x08;    // Z - Zero    if (value == 0)        ccr |= 0x04;    else        ccr &= ~0x04;    // V,C são sempre zerados    ccr &= ~0x03;    md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);    return cycles + 4;}
+/**
+ * @file m68k_instructions.c
+ * @brief Implementação das instruções da CPU Motorola 68000
+ *
+ * Este arquivo contém a implementação das funções para decodificação,
+ * execução e manipulação de operandos para a CPU M68K do Mega Drive.
+ */
+
+#include "m68k_instructions.h"
+#include "m68k.h"
+#include "m68k_timing.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Tabelas de ciclos para instruções
+static const uint32_t g_instruction_cycles[] = {
+    6,   // M68K_INST_ABCD
+    4,   // M68K_INST_ADD
+    8,   // M68K_INST_ADDA
+    8,   // M68K_INST_ADDI
+    4,   // M68K_INST_ADDQ
+    4,   // M68K_INST_ADDX
+    4,   // M68K_INST_AND
+    8,   // M68K_INST_ANDI
+    6,   // M68K_INST_ASL
+    6,   // M68K_INST_ASR
+    10,  // M68K_INST_BCC
+    8,   // M68K_INST_BCHG
+    8,   // M68K_INST_BCLR
+    10,  // M68K_INST_BRA
+    8,   // M68K_INST_BSET
+    18,  // M68K_INST_BSR
+    4,   // M68K_INST_BTST
+    10,  // M68K_INST_CHK
+    4,   // M68K_INST_CLR
+    4,   // M68K_INST_CMP
+    6,   // M68K_INST_CMPA
+    8,   // M68K_INST_CMPI
+    12,  // M68K_INST_CMPM
+    12,  // M68K_INST_DBCC
+    158, // M68K_INST_DIVS
+    140, // M68K_INST_DIVU
+    4,   // M68K_INST_EOR
+    8,   // M68K_INST_EORI
+    6,   // M68K_INST_EXG
+    4,   // M68K_INST_EXT
+    4,   // M68K_INST_ILLEGAL
+    8,   // M68K_INST_JMP
+    16,  // M68K_INST_JSR
+    4,   // M68K_INST_LEA
+    16,  // M68K_INST_LINK
+    6,   // M68K_INST_LSL
+    6,   // M68K_INST_LSR
+    4,   // M68K_INST_MOVE
+    4,   // M68K_INST_MOVEA
+    12,  // M68K_INST_MOVEM
+    16,  // M68K_INST_MOVEP
+    4,   // M68K_INST_MOVEQ
+    70,  // M68K_INST_MULS
+    70,  // M68K_INST_MULU
+    6,   // M68K_INST_NBCD
+    4,   // M68K_INST_NEG
+    4,   // M68K_INST_NEGX
+    4,   // M68K_INST_NOP
+    4,   // M68K_INST_NOT
+    4,   // M68K_INST_OR
+    8,   // M68K_INST_ORI
+    8,   // M68K_INST_PEA
+    132, // M68K_INST_RESET
+    6,   // M68K_INST_ROL
+    6,   // M68K_INST_ROR
+    8,   // M68K_INST_ROXL
+    8,   // M68K_INST_ROXR
+    20,  // M68K_INST_RTE
+    20,  // M68K_INST_RTR
+    16,  // M68K_INST_RTS
+    6,   // M68K_INST_SBCD
+    4,   // M68K_INST_SCC
+    4,   // M68K_INST_STOP
+    4,   // M68K_INST_SUB
+    8,   // M68K_INST_SUBA
+    8,   // M68K_INST_SUBI
+    4,   // M68K_INST_SUBQ
+    4,   // M68K_INST_SUBX
+    4,   // M68K_INST_SWAP
+    10,  // M68K_INST_TAS
+    4,   // M68K_INST_TRAP
+    4,   // M68K_INST_TRAPV
+    4,   // M68K_INST_TST
+    12,  // M68K_INST_UNLK
+    4    // M68K_INST_INVALID
+};
+
+// Tabelas de ciclos para modos de endereçamento
+static const uint32_t g_ea_cycles[] = {
+    0,  // M68K_ADDR_MODE_DATA_REG_DIRECT
+    0,  // M68K_ADDR_MODE_ADDR_REG_DIRECT
+    4,  // M68K_ADDR_MODE_ADDR_REG_INDIRECT
+    4,  // M68K_ADDR_MODE_ADDR_REG_INDIRECT_POST
+    6,  // M68K_ADDR_MODE_ADDR_REG_INDIRECT_PRE
+    8,  // M68K_ADDR_MODE_ADDR_REG_INDIRECT_DISP
+    10, // M68K_ADDR_MODE_ADDR_REG_INDIRECT_INDEX
+    8,  // M68K_ADDR_MODE_PC_INDIRECT_DISP
+    10, // M68K_ADDR_MODE_PC_INDIRECT_INDEX
+    8,  // M68K_ADDR_MODE_ABSOLUTE_SHORT
+    12, // M68K_ADDR_MODE_ABSOLUTE_LONG
+    4,  // M68K_ADDR_MODE_IMMEDIATE
+    0,  // M68K_ADDR_MODE_IMPLIED
+    0   // M68K_ADDR_MODE_INVALID
+};
+
+// Tabelas de ciclos para acessos à memória
+static const uint32_t g_mem_cycles[] = {
+    4, // M68K_SIZE_BYTE
+    4, // M68K_SIZE_WORD
+    8  // M68K_SIZE_LONG
+};
+
+// Tabelas de ciclos para branches
+static const uint32_t g_branch_cycles[] = {
+    10, // Branch taken (short)
+    10, // Branch taken (long)
+    8   // Branch not taken
+};
+
+int32_t md_m68k_decode_instruction(uint16_t opcode, uint32_t pc,
+                                   md_m68k_instruction_t *instruction) {
+  if (!instruction)
+    return 0;
+
+  // Limpa a estrutura
+  memset(instruction, 0, sizeof(md_m68k_instruction_t));
+
+  instruction->opcode = opcode;
+  instruction->address = pc;
+
+  // Decodifica o grupo principal do opcode
+  uint8_t group = (opcode >> 12) & 0xF;
+
+  switch (group) {
+  case 0x0: // Bit manipulation/MOVEP/Immediate
+    // TODO: Implementar decodificação
+    break;
+
+  case 0x1: // Move.B
+    instruction->type = M68K_INST_MOVE;
+    instruction->size = M68K_SIZE_BYTE;
+    break;
+
+  case 0x2: // Move.L
+    instruction->type = M68K_INST_MOVE;
+    instruction->size = M68K_SIZE_LONG;
+    break;
+
+  case 0x3: // Move.W
+    instruction->type = M68K_INST_MOVE;
+    instruction->size = M68K_SIZE_WORD;
+    break;
+
+    // TODO: Implementar outros grupos
+
+  default:
+    instruction->type = M68K_INST_INVALID;
+    break;
+  }
+
+  // Calcula informações de timing
+  instruction->timing.base_cycles = g_instruction_cycles[instruction->type];
+  instruction->timing.ea_cycles =
+      g_ea_cycles[instruction->src_mode] + g_ea_cycles[instruction->dst_mode];
+  instruction->timing.mem_cycles = g_mem_cycles[instruction->size];
+
+  // Configura flags de execução
+  instruction->execution.needs_prefetch = true;
+  instruction->execution.changes_pc = (instruction->type >= M68K_INST_BCC &&
+                                       instruction->type <= M68K_INST_BSR) ||
+                                      instruction->type == M68K_INST_JMP ||
+                                      instruction->type == M68K_INST_JSR ||
+                                      instruction->type == M68K_INST_RTE ||
+                                      instruction->type == M68K_INST_RTR ||
+                                      instruction->type == M68K_INST_RTS;
+
+  instruction->execution.is_privileged =
+      (instruction->type == M68K_INST_RESET ||
+       instruction->type == M68K_INST_STOP ||
+       instruction->type == M68K_INST_RTE);
+
+  instruction->execution.affects_ccr = true;
+
+  // Configura flags de timing
+  instruction->timing.is_rmw = (instruction->type == M68K_INST_ASL ||
+                                instruction->type == M68K_INST_ASR ||
+                                instruction->type == M68K_INST_LSL ||
+                                instruction->type == M68K_INST_LSR ||
+                                instruction->type == M68K_INST_ROL ||
+                                instruction->type == M68K_INST_ROR ||
+                                instruction->type == M68K_INST_ROXL ||
+                                instruction->type == M68K_INST_ROXR ||
+                                instruction->type == M68K_INST_TAS);
+
+  instruction->timing.uses_prefetch = true;
+
+  return 2; // Tamanho base da instrução
+}
+
+// Funções de execução específicas para cada instrução
+static int32_t execute_move(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t cycles = 0;
+
+  // Lê o valor fonte
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 instruction->size, &src_value, timing);
+
+  // Escreve no destino
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, src_value, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(src_value, instruction->size, 0x0F);
+
+  return cycles;
+}
+
+static int32_t execute_add(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t dst_value = 0;
+  uint32_t result = 0;
+  uint32_t cycles = 0;
+
+  // Lê os operandos
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 instruction->size, &src_value, timing);
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &dst_value, timing);
+
+  // Realiza a operação
+  result = dst_value + src_value;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, result, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(result, instruction->size, 0x0F);
+
+  return cycles;
+}
+
+static int32_t execute_sub(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t dst_value = 0;
+  uint32_t result = 0;
+  uint32_t cycles = 0;
+
+  // Lê os operandos
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 instruction->size, &src_value, timing);
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &dst_value, timing);
+
+  // Realiza a operação
+  result = dst_value - src_value;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, result, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(result, instruction->size, 0x0F);
+
+  return cycles;
+}
+
+static int32_t execute_and(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t dst_value = 0;
+  uint32_t result = 0;
+  uint32_t cycles = 0;
+
+  // Lê os operandos
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 instruction->size, &src_value, timing);
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &dst_value, timing);
+
+  // Realiza a operação
+  result = dst_value & src_value;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, result, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(result, instruction->size, 0x0F);
+
+  return cycles;
+}
+
+static int32_t execute_or(const md_m68k_instruction_t *instruction,
+                          md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t dst_value = 0;
+  uint32_t result = 0;
+  uint32_t cycles = 0;
+
+  // Lê os operandos
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 instruction->size, &src_value, timing);
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &dst_value, timing);
+
+  // Realiza a operação
+  result = dst_value | src_value;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, result, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(result, instruction->size, 0x0F);
+
+  return cycles;
+}
+
+static int32_t execute_eor(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t dst_value = 0;
+  uint32_t result = 0;
+  uint32_t cycles = 0;
+
+  // Lê os operandos
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 instruction->size, &src_value, timing);
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &dst_value, timing);
+
+  // Realiza a operação
+  result = dst_value ^ src_value;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, result, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(result, instruction->size, 0x0F);
+
+  return cycles;
+}
+
+static int32_t execute_not(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t value = 0;
+  uint32_t result = 0;
+  uint32_t cycles = 0;
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &value, timing);
+
+  // Realiza a operação
+  result = ~value;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, result, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(result, instruction->size, 0x0F);
+
+  return cycles;
+}
+
+static int32_t execute_neg(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t value = 0;
+  uint32_t result = 0;
+  uint32_t cycles = 0;
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &value, timing);
+
+  // Realiza a operação
+  result = 0 - value;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, result, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(result, instruction->size, 0x0F);
+
+  return cycles;
+}
+
+static int32_t execute_clr(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t cycles = 0;
+
+  // Escreve zero no destino
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, 0, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(0, instruction->size, 0x0F);
+
+  return cycles;
+}
+
+static int32_t execute_tst(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t value = 0;
+  uint32_t cycles = 0;
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &value, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(value, instruction->size, 0x0F);
+
+  return cycles;
+}
+
+static int32_t execute_jmp(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t address = 0;
+  uint32_t cycles = 0;
+
+  // Calcula o endereço efetivo
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_LONG, &address, timing);
+
+  // Atualiza o PC
+  md_m68k_set_pc(address);
+
+  return cycles;
+}
+
+static int32_t execute_jsr(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t address = 0;
+  uint32_t cycles = 0;
+
+  // Calcula o endereço efetivo
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_LONG, &address, timing);
+
+  // Empilha o endereço de retorno
+  uint32_t return_address = md_m68k_get_pc() + 2;
+  md_m68k_push_long(return_address);
+
+  // Atualiza o PC
+  md_m68k_set_pc(address);
+
+  return cycles;
+}
+
+static int32_t execute_rts(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t address = 0;
+
+  // Desempilha o endereço de retorno
+  address = md_m68k_pop_long();
+
+  // Atualiza o PC
+  md_m68k_set_pc(address);
+
+  return 16; // Ciclos fixos para RTS
+}
+
+static int32_t execute_bra(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  // Calcula o endereço de destino
+  uint32_t target = md_m68k_get_pc() + instruction->displacement;
+
+  // Atualiza o PC
+  md_m68k_set_pc(target);
+
+  // Retorna ciclos base + ciclos de branch
+  return instruction->timing.base_cycles + instruction->timing.branch_cycles;
+}
+
+static int32_t execute_bsr(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  // Calcula o endereço de destino
+  uint32_t target = md_m68k_get_pc() + instruction->displacement;
+
+  // Empilha o endereço de retorno
+  uint32_t return_address = md_m68k_get_pc() + 2;
+  md_m68k_push_long(return_address);
+
+  // Atualiza o PC
+  md_m68k_set_pc(target);
+
+  // Retorna ciclos base + ciclos de branch
+  return instruction->timing.base_cycles + instruction->timing.branch_cycles;
+}
+
+static int32_t execute_bcc(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  // Avalia a condição
+  bool condition_true = md_m68k_evaluate_condition(instruction->condition);
+
+  if (condition_true) {
+    // Calcula o endereço de destino
+    uint32_t target = md_m68k_get_pc() + instruction->displacement;
+
+    // Atualiza o PC
+    md_m68k_set_pc(target);
+
+    // Retorna ciclos para branch taken
+    return instruction->timing.base_cycles +
+           ((instruction->displacement > 127 ||
+             instruction->displacement < -128)
+                ? g_branch_cycles[1]
+                : g_branch_cycles[0]);
+  }
+
+  // Retorna ciclos para branch not taken
+  return instruction->timing.base_cycles + g_branch_cycles[2];
+}
+
+static int32_t execute_bchg(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t bit_num = 0;
+  uint32_t operand = 0;
+  uint32_t cycles = 0;
+
+  // Lê o número do bit
+  if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                   instruction->size, &bit_num, timing);
+    bit_num &= 0x1F; // Máscara para 32 bits
+  } else {
+    bit_num = instruction->immediate & 0x07; // Máscara para 8 bits
+  }
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &operand, timing);
+
+  // Testa o bit
+  uint32_t mask = 1 << bit_num;
+  bool bit_set = (operand & mask) != 0;
+
+  // Inverte o bit
+  operand ^= mask;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, operand, timing);
+
+  // Atualiza flag Z (zero se o bit estava setado)
+  if (bit_set) {
+    timing->ccr &= ~M68K_SR_Z;
+  } else {
+    timing->ccr |= M68K_SR_Z;
+  }
+
+  return cycles;
+}
+
+static int32_t execute_bclr(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t bit_num = 0;
+  uint32_t operand = 0;
+  uint32_t cycles = 0;
+
+  // Lê o número do bit
+  if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                   instruction->size, &bit_num, timing);
+    bit_num &= 0x1F;
+  } else {
+    bit_num = instruction->immediate & 0x07;
+  }
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &operand, timing);
+
+  // Testa o bit
+  uint32_t mask = 1 << bit_num;
+  bool bit_set = (operand & mask) != 0;
+
+  // Limpa o bit
+  operand &= ~mask;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, operand, timing);
+
+  // Atualiza flag Z (zero se o bit estava setado)
+  if (bit_set) {
+    timing->ccr &= ~M68K_SR_Z;
+  } else {
+    timing->ccr |= M68K_SR_Z;
+  }
+
+  return cycles;
+}
+
+static int32_t execute_bset(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t bit_num = 0;
+  uint32_t operand = 0;
+  uint32_t cycles = 0;
+
+  // Lê o número do bit
+  if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                   instruction->size, &bit_num, timing);
+    bit_num &= 0x1F;
+  } else {
+    bit_num = instruction->immediate & 0x07;
+  }
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &operand, timing);
+
+  // Testa o bit
+  uint32_t mask = 1 << bit_num;
+  bool bit_set = (operand & mask) != 0;
+
+  // Seta o bit
+  operand |= mask;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, operand, timing);
+
+  // Atualiza flag Z (zero se o bit estava setado)
+  if (bit_set) {
+    timing->ccr &= ~M68K_SR_Z;
+  } else {
+    timing->ccr |= M68K_SR_Z;
+  }
+
+  return cycles;
+}
+
+static int32_t execute_tas(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t operand = 0;
+  uint32_t cycles = 0;
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_BYTE, &operand, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(operand, M68K_SIZE_BYTE,
+                       M68K_SR_N | M68K_SR_Z | M68K_SR_V | M68K_SR_C);
+
+  // Seta o bit 7
+  operand |= 0x80;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  M68K_SIZE_BYTE, operand, timing);
+
+  return cycles;
+}
+
+static int32_t execute_swap(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t operand = 0;
+  uint32_t cycles = 0;
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_LONG, &operand, timing);
+
+  // Realiza o swap
+  operand = ((operand & 0xFFFF) << 16) | ((operand >> 16) & 0xFFFF);
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  M68K_SIZE_LONG, operand, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(operand, M68K_SIZE_LONG, M68K_SR_N | M68K_SR_Z);
+  timing->ccr &= ~(M68K_SR_V | M68K_SR_C); // Limpa V e C
+
+  return cycles;
+}
+
+static int32_t execute_ext(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t operand = 0;
+  uint32_t cycles = 0;
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &operand, timing);
+
+  // Realiza a extensão de sinal
+  if (instruction->size == M68K_SIZE_WORD) {
+    // Byte para Word
+    if (operand & 0x80) {
+      operand |= 0xFF00;
+    }
+  } else {
+    // Word para Long
+    if (operand & 0x8000) {
+      operand |= 0xFFFF0000;
+    }
+  }
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  instruction->size, operand, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(operand, instruction->size, M68K_SR_N | M68K_SR_Z);
+  timing->ccr &= ~(M68K_SR_V | M68K_SR_C); // Limpa V e C
+
+  return cycles;
+}
+
+static int32_t execute_link(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t sp = 0;
+  uint32_t an = 0;
+  uint32_t displacement = (int16_t)instruction->immediate;
+  uint32_t cycles = 0;
+
+  // Lê SP
+  cycles += md_m68k_read_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT, 7,
+                                 M68K_SIZE_LONG, &sp, timing);
+
+  // Lê An
+  cycles +=
+      md_m68k_read_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT, instruction->dst_reg,
+                           M68K_SIZE_LONG, &an, timing);
+
+  // Decrementa SP
+  sp -= 4;
+
+  // Salva An na pilha
+  cycles += md_m68k_write_operand(M68K_ADDR_MODE_ADDR_REG_INDIRECT_PRE, 7,
+                                  M68K_SIZE_LONG, an, timing);
+
+  // Move SP para An
+  cycles +=
+      md_m68k_write_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT,
+                            instruction->dst_reg, M68K_SIZE_LONG, sp, timing);
+
+  // Adiciona deslocamento ao SP
+  sp += displacement;
+
+  // Atualiza SP
+  cycles += md_m68k_write_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT, 7,
+                                  M68K_SIZE_LONG, sp, timing);
+
+  return cycles;
+}
+
+static int32_t execute_unlk(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t sp = 0;
+  uint32_t an = 0;
+  uint32_t cycles = 0;
+
+  // Move An para SP
+  cycles +=
+      md_m68k_read_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT, instruction->src_reg,
+                           M68K_SIZE_LONG, &sp, timing);
+  cycles += md_m68k_write_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT, 7,
+                                  M68K_SIZE_LONG, sp, timing);
+
+  // Restaura An da pilha
+  cycles += md_m68k_read_operand(M68K_ADDR_MODE_ADDR_REG_INDIRECT_POST, 7,
+                                 M68K_SIZE_LONG, &an, timing);
+  cycles +=
+      md_m68k_write_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT,
+                            instruction->src_reg, M68K_SIZE_LONG, an, timing);
+
+  return cycles;
+}
+
+static int32_t execute_pea(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t ea = 0;
+  uint32_t sp = 0;
+  uint32_t cycles = 0;
+
+  // Calcula endereço efetivo
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 M68K_SIZE_LONG, &ea, timing);
+
+  // Lê SP
+  cycles += md_m68k_read_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT, 7,
+                                 M68K_SIZE_LONG, &sp, timing);
+
+  // Decrementa SP
+  sp -= 4;
+  cycles += md_m68k_write_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT, 7,
+                                  M68K_SIZE_LONG, sp, timing);
+
+  // Empilha endereço
+  cycles += md_m68k_write_operand(M68K_ADDR_MODE_ADDR_REG_INDIRECT, 7,
+                                  M68K_SIZE_LONG, ea, timing);
+
+  return cycles;
+}
+
+static int32_t execute_muls(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t dst_value = 0;
+  uint32_t cycles = 0;
+
+  // Lê os operandos
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 M68K_SIZE_WORD, &src_value, timing);
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_WORD, &dst_value, timing);
+
+  // Converte para signed
+  int16_t src_signed = (int16_t)src_value;
+  int16_t dst_signed = (int16_t)dst_value;
+
+  // Realiza a multiplicação com sinal
+  int32_t result = (int32_t)src_signed * (int32_t)dst_signed;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  M68K_SIZE_LONG, (uint32_t)result, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags((uint32_t)result, M68K_SIZE_LONG, M68K_SR_N | M68K_SR_Z);
+  timing->ccr &= ~(M68K_SR_V | M68K_SR_C); // Limpa V e C
+
+  return cycles;
+}
+
+static int32_t execute_mulu(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t dst_value = 0;
+  uint32_t cycles = 0;
+
+  // Lê os operandos
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 M68K_SIZE_WORD, &src_value, timing);
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_WORD, &dst_value, timing);
+
+  // Realiza a multiplicação sem sinal
+  uint32_t result = (src_value & 0xFFFF) * (dst_value & 0xFFFF);
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  M68K_SIZE_LONG, result, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(result, M68K_SIZE_LONG, M68K_SR_N | M68K_SR_Z);
+  timing->ccr &= ~(M68K_SR_V | M68K_SR_C); // Limpa V e C
+
+  return cycles;
+}
+
+static int32_t execute_divs(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t dst_value = 0;
+  uint32_t cycles = 0;
+
+  // Lê os operandos
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 M68K_SIZE_WORD, &src_value, timing);
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_LONG, &dst_value, timing);
+
+  // Converte para signed
+  int16_t divisor = (int16_t)src_value;
+  int32_t dividend = (int32_t)dst_value;
+
+  // Verifica divisão por zero
+  if (divisor == 0) {
+    // TODO: Gerar exceção de divisão por zero
+    timing->ccr |= M68K_SR_V; // Seta flag de overflow
+    return cycles;
+  }
+
+  // Realiza a divisão com sinal
+  int16_t quotient = dividend / divisor;
+  int16_t remainder = dividend % divisor;
+
+  // Verifica overflow
+  if (quotient < -32768 || quotient > 32767) {
+    timing->ccr |= M68K_SR_V; // Seta flag de overflow
+    return cycles;
+  }
+
+  // Combina quociente e resto
+  uint32_t result =
+      ((uint32_t)(remainder & 0xFFFF) << 16) | (quotient & 0xFFFF);
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  M68K_SIZE_LONG, result, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(quotient, M68K_SIZE_WORD, M68K_SR_N | M68K_SR_Z);
+  timing->ccr &= ~M68K_SR_C; // Limpa C
+
+  return cycles;
+}
+
+static int32_t execute_divu(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t dst_value = 0;
+  uint32_t cycles = 0;
+
+  // Lê os operandos
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 M68K_SIZE_WORD, &src_value, timing);
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_LONG, &dst_value, timing);
+
+  uint16_t divisor = src_value & 0xFFFF;
+  uint32_t dividend = dst_value;
+
+  // Verifica divisão por zero
+  if (divisor == 0) {
+    // TODO: Gerar exceção de divisão por zero
+    timing->ccr |= M68K_SR_V; // Seta flag de overflow
+    return cycles;
+  }
+
+  // Realiza a divisão sem sinal
+  uint16_t quotient = dividend / divisor;
+  uint16_t remainder = dividend % divisor;
+
+  // Verifica overflow
+  if ((dividend / divisor) > 0xFFFF) {
+    timing->ccr |= M68K_SR_V; // Seta flag de overflow
+    return cycles;
+  }
+
+  // Combina quociente e resto
+  uint32_t result = ((uint32_t)remainder << 16) | quotient;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  M68K_SIZE_LONG, result, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags(quotient, M68K_SIZE_WORD, M68K_SR_N | M68K_SR_Z);
+  timing->ccr &= ~(M68K_SR_V | M68K_SR_C); // Limpa V e C
+
+  return cycles;
+}
+
+static int32_t execute_btst(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t bit_num = 0;
+  uint32_t operand = 0;
+  uint32_t cycles = 0;
+
+  // Lê o número do bit
+  if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                   instruction->size, &bit_num, timing);
+    bit_num &= 0x1F; // Máscara para 32 bits
+  } else {
+    bit_num = instruction->immediate & 0x07; // Máscara para 8 bits
+  }
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &operand, timing);
+
+  // Testa o bit
+  uint32_t mask = 1 << bit_num;
+  bool bit_set = (operand & mask) != 0;
+
+  // Atualiza flag Z (zero se o bit estava setado)
+  if (bit_set) {
+    timing->ccr &= ~M68K_SR_Z;
+  } else {
+    timing->ccr |= M68K_SR_Z;
+  }
+
+  return cycles;
+}
+
+static int32_t execute_stop(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t new_sr = instruction->immediate;
+  uint32_t cycles = 0;
+
+  // Verifica se está em modo supervisor
+  if (!(timing->sr & M68K_SR_S)) {
+    // TODO: Gerar exceção de privilégio
+    return cycles;
+  }
+
+  // Atualiza o SR
+  timing->sr = new_sr;
+
+  // Entra em estado de parada
+  timing->stopped = true;
+
+  return cycles;
+}
+
+static int32_t execute_trap(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t vector = instruction->immediate & 0x0F;
+  uint32_t cycles = 0;
+
+  // TODO: Implementar tratamento de exceção TRAP
+  // Deve salvar o contexto e pular para o vetor de exceção apropriado
+
+  return cycles;
+}
+
+static int32_t execute_trapv(const md_m68k_instruction_t *instruction,
+                             md_m68k_timing_t *timing) {
+  uint32_t cycles = 0;
+
+  // Verifica flag de overflow
+  if (timing->ccr & M68K_SR_V) {
+    // TODO: Implementar tratamento de exceção TRAPV
+    // Deve salvar o contexto e pular para o vetor de exceção
+  }
+
+  return cycles;
+}
+
+static int32_t execute_reset(const md_m68k_instruction_t *instruction,
+                             md_m68k_timing_t *timing) {
+  uint32_t cycles = 0;
+
+  // Verifica se está em modo supervisor
+  if (!(timing->sr & M68K_SR_S)) {
+    // TODO: Gerar exceção de privilégio
+    return cycles;
+  }
+
+  // TODO: Implementar reset externo
+  // Deve gerar sinal de reset para dispositivos externos
+
+  return cycles;
+}
+
+static int32_t execute_nop(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  // NOP não faz nada, apenas consome ciclos
+  return 0;
+}
+
+static int32_t execute_illegal(const md_m68k_instruction_t *instruction,
+                               md_m68k_timing_t *timing) {
+  // TODO: Implementar tratamento de instrução ilegal
+  // Deve gerar exceção de instrução ilegal
+  return 0;
+}
+
+static int32_t execute_movem(const md_m68k_instruction_t *instruction,
+                             md_m68k_timing_t *timing) {
+  uint32_t cycles = 0;
+  uint16_t mask = instruction->immediate;
+  uint32_t address = 0;
+  uint32_t value = 0;
+
+  // Lê o endereço base
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_LONG, &address, timing);
+
+  // Determina a direção (memória para registradores ou vice-versa)
+  bool mem_to_reg =
+      (instruction->dst_mode != M68K_ADDR_MODE_ADDR_REG_INDIRECT_PRE);
+
+  if (mem_to_reg) {
+    // Memória para registradores
+    for (int i = 0; i < 16; i++) {
+      if (mask & (1 << i)) {
+        // Lê da memória
+        cycles += md_m68k_read_operand(M68K_ADDR_MODE_ABSOLUTE_LONG, 0,
+                                       instruction->size, &value, timing);
+
+        // Escreve no registrador
+        if (i < 8) {
+          // Registrador de dados
+          cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, i,
+                                          instruction->size, value, timing);
+        } else {
+          // Registrador de endereço
+          cycles += md_m68k_write_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT, i - 8,
+                                          instruction->size, value, timing);
+        }
+
+        // Atualiza o endereço
+        address += (instruction->size == M68K_SIZE_LONG) ? 4 : 2;
+      }
+    }
+  } else {
+    // Registradores para memória
+    for (int i = 15; i >= 0; i--) {
+      if (mask & (1 << i)) {
+        // Lê do registrador
+        if (i < 8) {
+          // Registrador de dados
+          cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, i,
+                                         instruction->size, &value, timing);
+        } else {
+          // Registrador de endereço
+          cycles += md_m68k_read_operand(M68K_ADDR_MODE_ADDR_REG_DIRECT, i - 8,
+                                         instruction->size, &value, timing);
+        }
+
+        // Escreve na memória
+        cycles += md_m68k_write_operand(M68K_ADDR_MODE_ABSOLUTE_LONG, 0,
+                                        instruction->size, value, timing);
+
+        // Atualiza o endereço
+        address -= (instruction->size == M68K_SIZE_LONG) ? 4 : 2;
+      }
+    }
+  }
+
+  return cycles;
+}
+
+static int32_t execute_movep(const md_m68k_instruction_t *instruction,
+                             md_m68k_timing_t *timing) {
+  uint32_t cycles = 0;
+  uint32_t address = 0;
+  uint32_t value = 0;
+  uint32_t data = 0;
+
+  // Lê o endereço base
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_LONG, &address, timing);
+
+  if (instruction->direction == 0) {
+    // Memória para registrador
+    if (instruction->size == M68K_SIZE_WORD) {
+      // Word
+      data = 0;
+      cycles += md_m68k_read_operand(M68K_ADDR_MODE_ABSOLUTE_LONG, 0,
+                                     M68K_SIZE_BYTE, &value, timing);
+      data = (data << 8) | (value & 0xFF);
+      address += 2;
+      cycles += md_m68k_read_operand(M68K_ADDR_MODE_ABSOLUTE_LONG, 0,
+                                     M68K_SIZE_BYTE, &value, timing);
+      data = (data << 8) | (value & 0xFF);
+    } else {
+      // Long
+      data = 0;
+      for (int i = 0; i < 4; i++) {
+        cycles += md_m68k_read_operand(M68K_ADDR_MODE_ABSOLUTE_LONG, 0,
+                                       M68K_SIZE_BYTE, &value, timing);
+        data = (data << 8) | (value & 0xFF);
+        address += 2;
+      }
+    }
+    // Escreve no registrador de dados
+    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT,
+                                    instruction->src_reg, instruction->size,
+                                    data, timing);
+  } else {
+    // Registrador para memória
+    cycles += md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT,
+                                   instruction->src_reg, instruction->size,
+                                   &data, timing);
+
+    if (instruction->size == M68K_SIZE_WORD) {
+      // Word
+      value = (data >> 8) & 0xFF;
+      cycles += md_m68k_write_operand(M68K_ADDR_MODE_ABSOLUTE_LONG, 0,
+                                      M68K_SIZE_BYTE, value, timing);
+      address += 2;
+      value = data & 0xFF;
+      cycles += md_m68k_write_operand(M68K_ADDR_MODE_ABSOLUTE_LONG, 0,
+                                      M68K_SIZE_BYTE, value, timing);
+    } else {
+      // Long
+      for (int i = 0; i < 4; i++) {
+        value = (data >> (24 - i * 8)) & 0xFF;
+        cycles += md_m68k_write_operand(M68K_ADDR_MODE_ABSOLUTE_LONG, 0,
+                                        M68K_SIZE_BYTE, value, timing);
+        address += 2;
+      }
+    }
+  }
+
+  return cycles;
+}
+
+static int32_t execute_moveq(const md_m68k_instruction_t *instruction,
+                             md_m68k_timing_t *timing) {
+  uint32_t cycles = 0;
+  int8_t data = (int8_t)instruction->immediate;
+
+  // Extende o sinal para 32 bits
+  int32_t value = (int32_t)data;
+
+  // Escreve no registrador de dados
+  cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT,
+                                  instruction->dst_reg, M68K_SIZE_LONG,
+                                  (uint32_t)value, timing);
+
+  // Atualiza flags
+  md_m68k_update_flags((uint32_t)value, M68K_SIZE_LONG, M68K_SR_N | M68K_SR_Z);
+  timing->ccr &= ~(M68K_SR_V | M68K_SR_C); // Limpa V e C
+
+  return cycles;
+}
+
+static int32_t execute_scc(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t cycles = 0;
+  bool condition_met = md_m68k_evaluate_condition(instruction->condition);
+
+  // Escreve 0xFF se a condição for verdadeira, 0x00 caso contrário
+  uint32_t value = condition_met ? 0xFF : 0x00;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  M68K_SIZE_BYTE, value, timing);
+
+  return cycles;
+}
+
+static int32_t execute_dbcc(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t cycles = 0;
+  uint32_t counter = 0;
+  bool condition_met = md_m68k_evaluate_condition(instruction->condition);
+
+  // Lê o contador do registrador
+  cycles +=
+      md_m68k_read_operand(M68K_ADDR_MODE_DATA_REG_DIRECT, instruction->dst_reg,
+                           M68K_SIZE_WORD, &counter, timing);
+
+  if (!condition_met) {
+    // Decrementa o contador
+    counter = (counter - 1) & 0xFFFF;
+
+    // Escreve o novo valor do contador
+    cycles += md_m68k_write_operand(M68K_ADDR_MODE_DATA_REG_DIRECT,
+                                    instruction->dst_reg, M68K_SIZE_WORD,
+                                    counter, timing);
+
+    if ((int16_t)counter != -1) {
+      // Realiza o desvio
+      timing->pc += (int16_t)instruction->immediate;
+    }
+  }
+
+  return cycles;
+}
+
+static int32_t execute_abcd(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t dst_value = 0;
+  uint32_t cycles = 0;
+
+  // Lê os operandos
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 M68K_SIZE_BYTE, &src_value, timing);
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_BYTE, &dst_value, timing);
+
+  // Realiza a adição BCD
+  uint8_t src_lo = src_value & 0x0F;
+  uint8_t src_hi = (src_value >> 4) & 0x0F;
+  uint8_t dst_lo = dst_value & 0x0F;
+  uint8_t dst_hi = (dst_value >> 4) & 0x0F;
+  uint8_t carry = (timing->ccr & M68K_SR_X) ? 1 : 0;
+
+  // Soma os dígitos menos significativos
+  uint8_t result_lo = dst_lo + src_lo + carry;
+  carry = (result_lo > 9) ? 1 : 0;
+  if (carry)
+    result_lo -= 10;
+
+  // Soma os dígitos mais significativos
+  uint8_t result_hi = dst_hi + src_hi + carry;
+  carry = (result_hi > 9) ? 1 : 0;
+  if (carry)
+    result_hi -= 10;
+
+  // Combina os resultados
+  uint32_t result = (result_hi << 4) | result_lo;
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  M68K_SIZE_BYTE, result, timing);
+
+  // Atualiza flags
+  if (carry) {
+    timing->ccr |= (M68K_SR_X | M68K_SR_C);
+  } else {
+    timing->ccr &= ~(M68K_SR_X | M68K_SR_C);
+  }
+
+  if (result) {
+    timing->ccr &= ~M68K_SR_Z;
+  }
+  // Note: Z flag is cleared only if result is non-zero, otherwise unchanged
+
+  return cycles;
+}
+
+static int32_t execute_sbcd(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t src_value = 0;
+  uint32_t dst_value = 0;
+  uint32_t cycles = 0;
+
+  // Lê os operandos
+  cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                 M68K_SIZE_BYTE, &src_value, timing);
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_BYTE, &dst_value, timing);
+
+  // Realiza a subtração BCD
+  uint8_t src_lo = src_value & 0x0F;
+  uint8_t src_hi = (src_value >> 4) & 0x0F;
+  uint8_t dst_lo = dst_value & 0x0F;
+  uint8_t dst_hi = (dst_value >> 4) & 0x0F;
+  uint8_t borrow = (timing->ccr & M68K_SR_X) ? 1 : 0;
+
+  // Subtrai os dígitos menos significativos
+  int16_t result_lo = dst_lo - src_lo - borrow;
+  if (result_lo < 0) {
+    result_lo += 10;
+    borrow = 1;
+  } else {
+    borrow = 0;
+  }
+
+  // Subtrai os dígitos mais significativos
+  int16_t result_hi = dst_hi - src_hi - borrow;
+  if (result_hi < 0) {
+    result_hi += 10;
+    borrow = 1;
+  } else {
+    borrow = 0;
+  }
+
+  // Combina os resultados
+  uint32_t result = ((result_hi & 0x0F) << 4) | (result_lo & 0x0F);
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  M68K_SIZE_BYTE, result, timing);
+
+  // Atualiza flags
+  if (borrow) {
+    timing->ccr |= (M68K_SR_X | M68K_SR_C);
+  } else {
+    timing->ccr &= ~(M68K_SR_X | M68K_SR_C);
+  }
+
+  if (result) {
+    timing->ccr &= ~M68K_SR_Z;
+  }
+  // Note: Z flag is cleared only if result is non-zero, otherwise unchanged
+
+  return cycles;
+}
+
+static int32_t execute_nbcd(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t value = 0;
+  uint32_t cycles = 0;
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 M68K_SIZE_BYTE, &value, timing);
+
+  // Realiza a negação BCD
+  uint8_t lo = value & 0x0F;
+  uint8_t hi = (value >> 4) & 0x0F;
+  uint8_t borrow = (timing->ccr & M68K_SR_X) ? 1 : 0;
+
+  // Calcula o complemento de 10
+  int16_t result_lo = 0 - lo - borrow;
+  if (result_lo < 0) {
+    result_lo += 10;
+    borrow = 1;
+  } else {
+    borrow = 0;
+  }
+
+  int16_t result_hi = 0 - hi - borrow;
+  if (result_hi < 0) {
+    result_hi += 10;
+    borrow = 1;
+  } else {
+    borrow = 0;
+  }
+
+  // Combina os resultados
+  uint32_t result = ((result_hi & 0x0F) << 4) | (result_lo & 0x0F);
+
+  // Escreve o resultado
+  cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                  M68K_SIZE_BYTE, result, timing);
+
+  // Atualiza flags
+  if (borrow) {
+    timing->ccr |= (M68K_SR_X | M68K_SR_C);
+  } else {
+    timing->ccr &= ~(M68K_SR_X | M68K_SR_C);
+  }
+
+  if (result) {
+    timing->ccr &= ~M68K_SR_Z;
+  }
+  // Note: Z flag is cleared only if result is non-zero, otherwise unchanged
+
+  return cycles;
+}
+
+static int32_t execute_rol(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t value = 0;
+  uint32_t count = 0;
+  uint32_t cycles = 0;
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &value, timing);
+
+  // Determina a contagem de rotação
+  if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                   M68K_SIZE_LONG, &count, timing);
+    count &= 0x3F; // Máscara para 6 bits
+  } else {
+    count = instruction->immediate & 0x07; // Imediato limitado a 8
+    if (count == 0)
+      count = 8;
+  }
+
+  // Determina a máscara baseada no tamanho
+  uint32_t mask = (instruction->size == M68K_SIZE_BYTE)   ? 0xFF
+                  : (instruction->size == M68K_SIZE_WORD) ? 0xFFFF
+                                                          : 0xFFFFFFFF;
+  uint32_t msb = (instruction->size == M68K_SIZE_BYTE)   ? 7
+                 : (instruction->size == M68K_SIZE_WORD) ? 15
+                                                         : 31;
+
+  // Realiza a rotação
+  count %= (msb + 1);
+  if (count > 0) {
+    value &= mask;
+    uint32_t result = ((value << count) | (value >> (msb + 1 - count))) & mask;
+
+    // Escreve o resultado
+    cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                    instruction->size, result, timing);
+
+    // Atualiza flags
+    timing->ccr &= ~(M68K_SR_N | M68K_SR_Z | M68K_SR_V | M68K_SR_C);
+    if (result & (1 << msb))
+      timing->ccr |= M68K_SR_N;
+    if (result == 0)
+      timing->ccr |= M68K_SR_Z;
+    if (value & (1 << (count - 1)))
+      timing->ccr |= M68K_SR_C;
+  }
+
+  return cycles;
+}
+
+static int32_t execute_ror(const md_m68k_instruction_t *instruction,
+                           md_m68k_timing_t *timing) {
+  uint32_t value = 0;
+  uint32_t count = 0;
+  uint32_t cycles = 0;
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &value, timing);
+
+  // Determina a contagem de rotação
+  if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                   M68K_SIZE_LONG, &count, timing);
+    count &= 0x3F; // Máscara para 6 bits
+  } else {
+    count = instruction->immediate & 0x07; // Imediato limitado a 8
+    if (count == 0)
+      count = 8;
+  }
+
+  // Determina a máscara baseada no tamanho
+  uint32_t mask = (instruction->size == M68K_SIZE_BYTE)   ? 0xFF
+                  : (instruction->size == M68K_SIZE_WORD) ? 0xFFFF
+                                                          : 0xFFFFFFFF;
+  uint32_t msb = (instruction->size == M68K_SIZE_BYTE)   ? 7
+                 : (instruction->size == M68K_SIZE_WORD) ? 15
+                                                         : 31;
+
+  // Realiza a rotação
+  count %= (msb + 1);
+  if (count > 0) {
+    value &= mask;
+    uint32_t result = ((value >> count) | (value << (msb + 1 - count))) & mask;
+
+    // Escreve o resultado
+    cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                    instruction->size, result, timing);
+
+    // Atualiza flags
+    timing->ccr &= ~(M68K_SR_N | M68K_SR_Z | M68K_SR_V | M68K_SR_C);
+    if (result & (1 << msb))
+      timing->ccr |= M68K_SR_N;
+    if (result == 0)
+      timing->ccr |= M68K_SR_Z;
+    if (value & (1 << (count - 1)))
+      timing->ccr |= M68K_SR_C;
+  }
+
+  return cycles;
+}
+
+static int32_t execute_roxl(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t value = 0;
+  uint32_t count = 0;
+  uint32_t cycles = 0;
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &value, timing);
+
+  // Determina a contagem de rotação
+  if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                   M68K_SIZE_LONG, &count, timing);
+    count &= 0x3F; // Máscara para 6 bits
+  } else {
+    count = instruction->immediate & 0x07; // Imediato limitado a 8
+    if (count == 0)
+      count = 8;
+  }
+
+  // Determina a máscara baseada no tamanho
+  uint32_t mask = (instruction->size == M68K_SIZE_BYTE)   ? 0xFF
+                  : (instruction->size == M68K_SIZE_WORD) ? 0xFFFF
+                                                          : 0xFFFFFFFF;
+  uint32_t msb = (instruction->size == M68K_SIZE_BYTE)   ? 7
+                 : (instruction->size == M68K_SIZE_WORD) ? 15
+                                                         : 31;
+
+  // Realiza a rotação com extend
+  count %= (msb + 2); // +2 para incluir o bit X
+  if (count > 0) {
+    value &= mask;
+    uint32_t x = (timing->ccr & M68K_SR_X) ? 1 : 0;
+    uint32_t result = value;
+    uint32_t new_x = x;
+
+    for (uint32_t i = 0; i < count; i++) {
+      uint32_t old_msb = (result >> msb) & 1;
+      result = ((result << 1) | new_x) & mask;
+      new_x = old_msb;
+    }
+
+    // Escreve o resultado
+    cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                    instruction->size, result, timing);
+
+    // Atualiza flags
+    timing->ccr &= ~(M68K_SR_N | M68K_SR_Z | M68K_SR_V | M68K_SR_C | M68K_SR_X);
+    if (result & (1 << msb))
+      timing->ccr |= M68K_SR_N;
+    if (result == 0)
+      timing->ccr |= M68K_SR_Z;
+    if (new_x)
+      timing->ccr |= (M68K_SR_C | M68K_SR_X);
+  }
+
+  return cycles;
+}
+
+static int32_t execute_roxr(const md_m68k_instruction_t *instruction,
+                            md_m68k_timing_t *timing) {
+  uint32_t value = 0;
+  uint32_t count = 0;
+  uint32_t cycles = 0;
+
+  // Lê o operando
+  cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg,
+                                 instruction->size, &value, timing);
+
+  // Determina a contagem de rotação
+  if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+    cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg,
+                                   M68K_SIZE_LONG, &count, timing);
+    count &= 0x3F; // Máscara para 6 bits
+  } else {
+    count = instruction->immediate & 0x07; // Imediato limitado a 8
+    if (count == 0)
+      count = 8;
+  }
+
+  // Determina a máscara baseada no tamanho
+  uint32_t mask = (instruction->size == M68K_SIZE_BYTE)   ? 0xFF
+                  : (instruction->size == M68K_SIZE_WORD) ? 0xFFFF
+                                                          : 0xFFFFFFFF;
+  uint32_t msb = (instruction->size == M68K_SIZE_BYTE)   ? 7
+                 : (instruction->size == M68K_SIZE_WORD) ? 15
+                                                         : 31;
+
+  // Realiza a rotação com extend
+  count %= (msb + 2); // +2 para incluir o bit X
+  if (count > 0) {
+    value &= mask;
+    uint32_t x = (timing->ccr & M68K_SR_X) ? 1 : 0;
+    uint32_t result = value;
+    uint32_t new_x = x;
+
+    for (uint32_t i = 0; i < count; i++) {
+      uint32_t old_lsb = result & 1;
+      result = (result >> 1) | (new_x << msb);
+      new_x = old_lsb;
+    }
+
+    // Escreve o resultado
+    cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg,
+                                    instruction->size, result, timing);
+
+    // Atualiza flags
+    timing->ccr &= ~(M68K_SR_N | M68K_SR_Z | M68K_SR_V | M68K_SR_C | M68K_SR_X);
+    if (result & (1 << msb))
+      timing->ccr |= M68K_SR_N;
+    if (result == 0)
+      timing->ccr |= M68K_SR_Z;
+    if (new_x)
+      timing->ccr |= (M68K_SR_C | M68K_SR_X);
+  }
+
+  return cycles;
+}
+
+static int32_t execute_asl(const md_m68k_instruction_t* instruction, md_m68k_timing_t* timing) {
+    uint32_t value = 0;
+    uint32_t count = 0;
+    uint32_t cycles = 0;
+
+    // Lê o operando
+    cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg, instruction->size, &value, timing);
+
+    // Determina a contagem de deslocamento
+    if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+        cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg, M68K_SIZE_LONG, &count, timing);
+        count &= 0x3F; // Máscara para 6 bits
+    } else {
+        count = instruction->immediate & 0x07; // Imediato limitado a 8
+        if (count == 0) count = 8;
+    }
+
+    // Determina a máscara baseada no tamanho
+    uint32_t mask = (instruction->size == M68K_SIZE_BYTE) ? 0xFF :
+                    (instruction->size == M68K_SIZE_WORD) ? 0xFFFF : 0xFFFFFFFF;
+    uint32_t msb = (instruction->size == M68K_SIZE_BYTE) ? 7 :
+                   (instruction->size == M68K_SIZE_WORD) ? 15 : 31;
+
+    // Realiza o deslocamento aritmético à esquerda
+    if (count > 0) {
+        value &= mask;
+        uint32_t result = 0;
+        bool overflow = false;
+        uint32_t last_bit = 0;
+
+        // Verifica overflow (mudança no bit de sinal durante o deslocamento)
+        int32_t sign_bit = (value >> msb) & 1;
+
+        for (uint32_t i = 0; i < count; i++) {
+            last_bit = (value >> msb) & 1;
+            value = (value << 1) & mask;
+            if (((value >> msb) & 1) != sign_bit) {
+                overflow = true;
+            }
+        }
+
+        result = value;
+
+        // Escreve o resultado
+        cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg, instruction->size, result, timing);
+
+        // Atualiza flags
+        timing->ccr &= ~(M68K_SR_N | M68K_SR_Z | M68K_SR_V | M68K_SR_C | M68K_SR_X);
+        if (result & (1 << msb)) timing->ccr |= M68K_SR_N;
+        if (result == 0) timing->ccr |= M68K_SR_Z;
+        if (overflow) timing->ccr |= M68K_SR_V;
+        if (last_bit) timing->ccr |= (M68K_SR_C | M68K_SR_X);
+    }
+
+    return cycles;
+}
+
+static int32_t execute_asr(const md_m68k_instruction_t* instruction, md_m68k_timing_t* timing) {
+    uint32_t value = 0;
+    uint32_t count = 0;
+    uint32_t cycles = 0;
+
+    // Lê o operando
+    cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg, instruction->size, &value, timing);
+
+    // Determina a contagem de deslocamento
+    if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+        cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg, M68K_SIZE_LONG, &count, timing);
+        count &= 0x3F; // Máscara para 6 bits
+    } else {
+        count = instruction->immediate & 0x07; // Imediato limitado a 8
+        if (count == 0) count = 8;
+    }
+
+    // Determina a máscara baseada no tamanho
+    uint32_t mask = (instruction->size == M68K_SIZE_BYTE) ? 0xFF :
+                    (instruction->size == M68K_SIZE_WORD) ? 0xFFFF : 0xFFFFFFFF;
+    uint32_t msb = (instruction->size == M68K_SIZE_BYTE) ? 7 :
+                   (instruction->size == M68K_SIZE_WORD) ? 15 : 31;
+
+    // Realiza o deslocamento aritmético à direita
+    if (count > 0) {
+        value &= mask;
+        uint32_t sign_bit = value & (1 << msb);
+        uint32_t result = value;
+        uint32_t last_bit = 0;
+
+        for (uint32_t i = 0; i < count; i++) {
+            last_bit = result & 1;
+            result = (result >> 1) | sign_bit;
+        }
+
+        result &= mask;
+
+        // Escreve o resultado
+        cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg, instruction->size, result, timing);
+
+        // Atualiza flags
+        timing->ccr &= ~(M68K_SR_N | M68K_SR_Z | M68K_SR_V | M68K_SR_C | M68K_SR_X);
+        if (result & (1 << msb)) timing->ccr |= M68K_SR_N;
+        if (result == 0) timing->ccr |= M68K_SR_Z;
+        if (last_bit) timing->ccr |= (M68K_SR_C | M68K_SR_X);
+    }
+
+    return cycles;
+}
+
+static int32_t execute_lsl(const md_m68k_instruction_t* instruction, md_m68k_timing_t* timing) {
+    uint32_t value = 0;
+    uint32_t count = 0;
+    uint32_t cycles = 0;
+
+    // Lê o operando
+    cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg, instruction->size, &value, timing);
+
+    // Determina a contagem de deslocamento
+    if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+        cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg, M68K_SIZE_LONG, &count, timing);
+        count &= 0x3F; // Máscara para 6 bits
+    } else {
+        count = instruction->immediate & 0x07; // Imediato limitado a 8
+        if (count == 0) count = 8;
+    }
+
+    // Determina a máscara baseada no tamanho
+    uint32_t mask = (instruction->size == M68K_SIZE_BYTE) ? 0xFF :
+                    (instruction->size == M68K_SIZE_WORD) ? 0xFFFF : 0xFFFFFFFF;
+    uint32_t msb = (instruction->size == M68K_SIZE_BYTE) ? 7 :
+                   (instruction->size == M68K_SIZE_WORD) ? 15 : 31;
+
+    // Realiza o deslocamento lógico à esquerda
+    if (count > 0) {
+        value &= mask;
+        uint32_t last_bit = 0;
+
+        for (uint32_t i = 0; i < count; i++) {
+            last_bit = (value >> msb) & 1;
+            value = (value << 1) & mask;
+        }
+
+        // Escreve o resultado
+        cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg, instruction->size, value, timing);
+
+        // Atualiza flags
+        timing->ccr &= ~(M68K_SR_N | M68K_SR_Z | M68K_SR_V | M68K_SR_C | M68K_SR_X);
+        if (value & (1 << msb)) timing->ccr |= M68K_SR_N;
+        if (value == 0) timing->ccr |= M68K_SR_Z;
+        if (last_bit) timing->ccr |= (M68K_SR_C | M68K_SR_X);
+    }
+
+    return cycles;
+}
+
+static int32_t execute_lsr(const md_m68k_instruction_t* instruction, md_m68k_timing_t* timing) {
+    uint32_t value = 0;
+    uint32_t count = 0;
+    uint32_t cycles = 0;
+
+    // Lê o operando
+    cycles += md_m68k_read_operand(instruction->dst_mode, instruction->dst_reg, instruction->size, &value, timing);
+
+    // Determina a contagem de deslocamento
+    if (instruction->src_mode == M68K_ADDR_MODE_DATA_REG_DIRECT) {
+        cycles += md_m68k_read_operand(instruction->src_mode, instruction->src_reg, M68K_SIZE_LONG, &count, timing);
+        count &= 0x3F; // Máscara para 6 bits
+    } else {
+        count = instruction->immediate & 0x07; // Imediato limitado a 8
+        if (count == 0) count = 8;
+    }
+
+    // Determina a máscara baseada no tamanho
+    uint32_t mask = (instruction->size == M68K_SIZE_BYTE) ? 0xFF :
+                    (instruction->size == M68K_SIZE_WORD) ? 0xFFFF : 0xFFFFFFFF;
+    uint32_t msb = (instruction->size == M68K_SIZE_BYTE) ? 7 :
+                   (instruction->size == M68K_SIZE_WORD) ? 15 : 31;
+
+    // Realiza o deslocamento lógico à direita
+    if (count > 0) {
+        value &= mask;
+        uint32_t last_bit = 0;
+
+        for (uint32_t i = 0; i < count; i++) {
+            last_bit = value & 1;
+            value = (value >> 1) & mask;
+        }
+
+        // Escreve o resultado
+        cycles += md_m68k_write_operand(instruction->dst_mode, instruction->dst_reg, instruction->size, value, timing);
+
+        // Atualiza flags
+        timing->ccr &= ~(M68K_SR_N | M68K_SR_Z | M68K_SR_V | M68K_SR_C | M68K_SR_X);
+        if (value & (1 << msb)) timing->ccr |= M68K_SR_N;
+        if (value == 0) timing->ccr |= M68K_SR_Z;
+        if (last_bit) timing->ccr |= (M68K_SR_C | M68K_SR_X);
+    }
+
+    return cycles;
+}
+
+// Atualiza a função principal de execução
+int32_t md_m68k_execute_instruction(const md_m68k_instruction_t *instruction,
+                                    md_m68k_timing_t *timing) {
+  if (!instruction || !timing)
+    return 0;
+
+  int32_t cycles = 0;
+
+  switch (instruction->type) {
+  case M68K_INST_MOVE:
+    cycles = execute_move(instruction, timing);
+    break;
+  case M68K_INST_ADD:
+    cycles = execute_add(instruction, timing);
+    break;
+  case M68K_INST_SUB:
+    cycles = execute_sub(instruction, timing);
+    break;
+  case M68K_INST_AND:
+    cycles = execute_and(instruction, timing);
+    break;
+  case M68K_INST_OR:
+    cycles = execute_or(instruction, timing);
+    break;
+  case M68K_INST_EOR:
+    cycles = execute_eor(instruction, timing);
+    break;
+  case M68K_INST_NOT:
+    cycles = execute_not(instruction, timing);
+    break;
+  case M68K_INST_NEG:
+    cycles = execute_neg(instruction, timing);
+    break;
+  case M68K_INST_CLR:
+    cycles = execute_clr(instruction, timing);
+    break;
+  case M68K_INST_TST:
+    cycles = execute_tst(instruction, timing);
+    break;
+  case M68K_INST_JMP:
+    cycles = execute_jmp(instruction, timing);
+    break;
+  case M68K_INST_JSR:
+    cycles = execute_jsr(instruction, timing);
+    break;
+  case M68K_INST_RTS:
+    cycles = execute_rts(instruction, timing);
+    break;
+  case M68K_INST_BRA:
+    cycles = execute_bra(instruction, timing);
+    break;
+  case M68K_INST_BSR:
+    cycles = execute_bsr(instruction, timing);
+    break;
+  case M68K_INST_BCC:
+    cycles = execute_bcc(instruction, timing);
+    break;
+  case M68K_INST_BCHG:
+    cycles = execute_bchg(instruction, timing);
+    break;
+  case M68K_INST_BCLR:
+    cycles = execute_bclr(instruction, timing);
+    break;
+  case M68K_INST_BSET:
+    cycles = execute_bset(instruction, timing);
+    break;
+  case M68K_INST_TAS:
+    cycles = execute_tas(instruction, timing);
+    break;
+  case M68K_INST_SWAP:
+    cycles = execute_swap(instruction, timing);
+    break;
+  case M68K_INST_EXT:
+    cycles = execute_ext(instruction, timing);
+    break;
+  case M68K_INST_LINK:
+    cycles = execute_link(instruction, timing);
+    break;
+  case M68K_INST_UNLK:
+    cycles = execute_unlk(instruction, timing);
+    break;
+  case M68K_INST_PEA:
+    cycles = execute_pea(instruction, timing);
+    break;
+  case M68K_INST_MULS:
+    cycles = execute_muls(instruction, timing);
+    break;
+  case M68K_INST_MULU:
+    cycles = execute_mulu(instruction, timing);
+    break;
+  case M68K_INST_DIVS:
+    cycles = execute_divs(instruction, timing);
+    break;
+  case M68K_INST_DIVU:
+    cycles = execute_divu(instruction, timing);
+    break;
+  case M68K_INST_BTST:
+    cycles = execute_btst(instruction, timing);
+    break;
+  case M68K_INST_STOP:
+    cycles = execute_stop(instruction, timing);
+    break;
+  case M68K_INST_TRAP:
+    cycles = execute_trap(instruction, timing);
+    break;
+  case M68K_INST_TRAPV:
+    cycles = execute_trapv(instruction, timing);
+    break;
+  case M68K_INST_RESET:
+    cycles = execute_reset(instruction, timing);
+    break;
+  case M68K_INST_NOP:
+    cycles = execute_nop(instruction, timing);
+    break;
+  case M68K_INST_ILLEGAL:
+    cycles = execute_illegal(instruction, timing);
+    break;
+  case M68K_INST_MOVEM:
+    cycles = execute_movem(instruction, timing);
+    break;
+  case M68K_INST_MOVEP:
+    cycles = execute_movep(instruction, timing);
+    break;
+  case M68K_INST_MOVEQ:
+    cycles = execute_moveq(instruction, timing);
+    break;
+  case M68K_INST_SCC:
+    cycles = execute_scc(instruction, timing);
+    break;
+  case M68K_INST_DBCC:
+    cycles = execute_dbcc(instruction, timing);
+    break;
+  case M68K_INST_ABCD:
+    cycles = execute_abcd(instruction, timing);
+    break;
+  case M68K_INST_SBCD:
+    cycles = execute_sbcd(instruction, timing);
+    break;
+  case M68K_INST_NBCD:
+    cycles = execute_nbcd(instruction, timing);
+    break;
+  case M68K_INST_ROL:
+    cycles = execute_rol(instruction, timing);
+    break;
+  case M68K_INST_ROR:
+    cycles = execute_ror(instruction, timing);
+    break;
+  case M68K_INST_ROXL:
+    cycles = execute_roxl(instruction, timing);
+    break;
+  case M68K_INST_ROXR:
+    cycles = execute_roxr(instruction, timing);
+    break;
+  case M68K_INST_ASL:
+    cycles = execute_asl(instruction, timing);
+    break;
+  case M68K_INST_ASR:
+    cycles = execute_asr(instruction, timing);
+    break;
+  case M68K_INST_LSL:
+    cycles = execute_lsl(instruction, timing);
+    break;
+  case M68K_INST_LSR:
+    cycles = execute_lsr(instruction, timing);
+    break;
+  default:
+    // Instrução não implementada ou inválida
+    cycles = 4; // Ciclos padrão para instruções não implementadas
+    break;
+  }
+
+  return cycles + instruction->timing.base_cycles;
+}
+
+int32_t md_m68k_read_operand(md_m68k_addr_mode_t mode, uint8_t reg,
+                             md_m68k_size_t size, uint32_t *value,
+                             md_m68k_timing_t *timing) {
+  if (!value || !timing)
+    return 0;
+
+  uint32_t cycles = 0;
+
+  // Calcula ciclos do modo de endereçamento
+  cycles += g_ea_cycles[mode];
+
+  // Adiciona ciclos de acesso à memória se necessário
+  if (mode != M68K_ADDR_MODE_DATA_REG_DIRECT &&
+      mode != M68K_ADDR_MODE_ADDR_REG_DIRECT) {
+    cycles += g_mem_cycles[size];
+  }
+
+  // Atualiza o timing
+  md_m68k_add_cycles(timing, cycles);
+
+  // TODO: Implementar leitura do operando
+
+  return cycles;
+}
+
+int32_t md_m68k_write_operand(md_m68k_addr_mode_t mode, uint8_t reg,
+                              md_m68k_size_t size, uint32_t value,
+                              md_m68k_timing_t *timing) {
+  if (!timing)
+    return 0;
+
+  uint32_t cycles = 0;
+
+  // Calcula ciclos do modo de endereçamento
+  cycles += g_ea_cycles[mode];
+
+  // Adiciona ciclos de acesso à memória se necessário
+  if (mode != M68K_ADDR_MODE_DATA_REG_DIRECT &&
+      mode != M68K_ADDR_MODE_ADDR_REG_DIRECT) {
+    cycles += g_mem_cycles[size];
+  }
+
+  // Atualiza o timing
+  md_m68k_add_cycles(timing, cycles);
+
+  // TODO: Implementar escrita do operando
+
+  return cycles;
+}
+
+void md_m68k_update_flags(uint32_t result, md_m68k_size_t size,
+                          uint16_t update_mask) {
+  uint16_t ccr = md_m68k_get_sr() & 0xFF;
+  uint32_t mask;
+
+  // Determina a máscara com base no tamanho
+  switch (size) {
+  case M68K_SIZE_BYTE:
+    mask = 0xFF;
+    break;
+  case M68K_SIZE_WORD:
+    mask = 0xFFFF;
+    break;
+  case M68K_SIZE_LONG:
+    mask = 0xFFFFFFFF;
+    break;
+  default:
+    return;
+  }
+
+  // Atualiza cada flag se necessário
+  if (update_mask & 0x01) { // N - Negative
+    if (result & ((mask >> 1) + 1)) {
+      ccr |= 0x08;
+    } else {
+      ccr &= ~0x08;
+    }
+  }
+
+  if (update_mask & 0x02) { // Z - Zero
+    if ((result & mask) == 0) {
+      ccr |= 0x04;
+    } else {
+      ccr &= ~0x04;
+    }
+  }
+
+  if (update_mask & 0x04) { // V - Overflow
+    // Normalmente calculado durante a instrução específica
+    ccr &= ~0x02;
+  }
+
+  if (update_mask & 0x08) { // C - Carry
+    // Normalmente calculado durante a instrução específica
+    ccr &= ~0x01;
+  }
+
+  // Atualiza o registrador de status
+  md_m68k_set_sr((md_m68k_get_sr() & 0xFF00) | ccr);
+}
+
+int32_t md_m68k_evaluate_condition(uint8_t condition) {
+  uint16_t sr = md_m68k_get_sr();
+  bool n = (sr & 0x08) != 0; // Negative
+  bool z = (sr & 0x04) != 0; // Zero
+  bool v = (sr & 0x02) != 0; // Overflow
+  bool c = (sr & 0x01) != 0; // Carry
+
+  switch (condition) {
+  case 0x0:
+    return true; // T  - Always true
+  case 0x1:
+    return false; // F  - Always false
+  case 0x2:
+    return !c && !z; // HI - Higher
+  case 0x3:
+    return c || z; // LS - Lower or same
+  case 0x4:
+    return !c; // CC - Carry clear
+  case 0x5:
+    return c; // CS - Carry set
+  case 0x6:
+    return !z; // NE - Not equal
+  case 0x7:
+    return z; // EQ - Equal
+  case 0x8:
+    return !v; // VC - Overflow clear
+  case 0x9:
+    return v; // VS - Overflow set
+  case 0xA:
+    return !n; // PL - Plus
+  case 0xB:
+    return n; // MI - Minus
+  case 0xC:
+    return n == v; // GE - Greater or equal
+  case 0xD:
+    return n != v; // LT - Less than
+  case 0xE:
+    return !z && (n == v); // GT - Greater than
+  case 0xF:
+    return z || (n != v); // LE - Less or equal
+  default:
+    return false;
+  }
+}
+
+uint32_t md_m68k_calculate_ea_timing(md_m68k_addr_mode_t mode, uint8_t reg,
+                                     bool is_read, md_m68k_timing_t *timing) {
+  if (!timing)
+    return 0;
+
+  uint32_t cycles = g_ea_cycles[mode];
+
+  // Adiciona ciclos extras para escrita
+  if (!is_read) {
+    cycles += 2;
+  }
+
+  return cycles;
+}
+
+uint32_t
+md_m68k_calculate_instruction_timing(const md_m68k_instruction_t *instruction) {
+  if (!instruction)
+    return 0;
+
+  uint32_t total_cycles = instruction->timing.base_cycles;
+
+  // Adiciona ciclos de EA
+  total_cycles += instruction->timing.ea_cycles;
+
+  // Adiciona ciclos de memória
+  total_cycles += instruction->timing.mem_cycles;
+
+  // Adiciona ciclos de branch
+  if (instruction->execution.changes_pc) {
+    if (instruction->type >= M68K_INST_BCC &&
+        instruction->type <= M68K_INST_BSR) {
+      bool condition_true = md_m68k_evaluate_condition(instruction->condition);
+      if (condition_true) {
+        total_cycles += (instruction->displacement > 127 ||
+                         instruction->displacement < -128)
+                            ? g_branch_cycles[1]
+                            : g_branch_cycles[0];
+      } else {
+        total_cycles += g_branch_cycles[2];
+      }
+    }
+  }
+
+  return total_cycles;
+}

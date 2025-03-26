@@ -1,102 +1,84 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.10)
 
 # Definir projeto
-project(Mega_Emu VERSION 0.1.0 LANGUAGES C CXX)
+project(mega_emu VERSION 1.0.0 LANGUAGES C CXX)
 
-# Configurar vcpkg (deve ser antes de qualquer find_package)
+# Configurar vcpkg
 if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-        CACHE STRING "")
-    message(STATUS "Usando vcpkg toolchain: ${CMAKE_TOOLCHAIN_FILE}")
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
 endif()
 
-# Verificar se o toolchain foi configurado
-if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    message(FATAL_ERROR "CMAKE_TOOLCHAIN_FILE não está definido. Configure VCPKG_ROOT ou especifique o toolchain manualmente.")
-endif()
+# Configurar opções de compilação
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Opções de build
-option(BUILD_TESTS "Build tests" OFF)
-option(USE_SDL2 "Use SDL2 for graphics and audio" ON)
-option(BUILD_NES "Build NES emulation" ON)
-option(BUILD_MEGADRIVE "Build Mega Drive emulation" ON)
-option(BUILD_MASTERSYSTEM "Build Master System emulation" ON)
-option(BUILD_FRONTEND_SDL "Build SDL2 frontend" ON)
-option(BUILD_FRONTEND_QT "Build Qt frontend" OFF)
-option(BUILD_FRONTEND_REACT "Build React frontend" ON)
-option(BUILD_TOOLS "Build Mega_tools" ON)
+# Configurar opções de build
+option(BUILD_NES "Build NES emulator" ON)
+option(BUILD_MEGADRIVE "Build Mega Drive emulator" ON)
+option(BUILD_SDL_FRONTEND "Build SDL frontend" ON)
+option(BUILD_CORE_CPU "Build core CPU components" ON)
+option(BUILD_CORE_PPU "Build core PPU components" ON)
 
 # Configurar diretórios de saída
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-# Configurar compilador
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-# Flags de compilação
-if(MSVC)
-    add_compile_options(/W4 /WX)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
-endif()
-
-# Encontrar dependências
-find_package(SDL2 REQUIRED)
-if(BUILD_FRONTEND_QT)
-    find_package(Qt5 COMPONENTS Core Gui Widgets REQUIRED)
-endif()
+# Encontrar pacotes necessários
 find_package(OpenGL REQUIRED)
-find_package(GLEW REQUIRED)
-find_package(ZLIB REQUIRED)
-find_package(PNG REQUIRED)
-find_package(JPEG REQUIRED)
-find_package(Freetype REQUIRED)
+find_package(SDL2 CONFIG REQUIRED)
+find_package(Lua REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system filesystem)
 
-# Configurar testes
-if(BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(tests)
+# Incluir diretórios
+include_directories(
+    ${SDL2_INCLUDE_DIRS}
+    ${LUA_INCLUDE_DIR}
+    ${Boost_INCLUDE_DIRS}
+    ${PROJECT_SOURCE_DIR}/src
+)
+
+# Adicionar componentes do core
+if(BUILD_CORE_CPU)
+    add_subdirectory(src/core/cpu)
+endif()
+
+if(BUILD_CORE_PPU)
+    add_subdirectory(src/core/video)
 endif()
 
 # Adicionar subdiretórios
-add_subdirectory(src)
+add_subdirectory(src/tools)
+add_subdirectory(src/frontend/sdl)
+add_subdirectory(src/platforms/megadrive)
 
-# Configurar emuladores
-if(BUILD_NES)
-    add_subdirectory(src/platforms/nes)
-endif()
+# Adicionar arquivos fonte
+file(GLOB_RECURSE SOURCES
+    "src/*.c"
+    "src/*.cpp"
+)
 
-if(BUILD_MEGADRIVE)
-    add_subdirectory(src/platforms/megadrive)
-endif()
+# Criar executável
+add_executable(${PROJECT_NAME} ${SOURCES})
 
-if(BUILD_MASTERSYSTEM)
-    add_subdirectory(src/platforms/mastersystem)
-endif()
+# Vincular bibliotecas
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
+    $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
+    ${LUA_LIBRARIES}
+    Boost::system
+    Boost::filesystem
+    OpenGL::GL
+)
 
-# Configurar frontends
-if(BUILD_FRONTEND_SDL)
-    add_subdirectory(src/frontend/sdl)
-endif()
+# Copiar recursos para o diretório de build
+file(COPY ${PROJECT_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR})
 
-if(BUILD_FRONTEND_QT)
-    add_subdirectory(src/frontend/qt)
-endif()
-
-# Adicionar frontend React se habilitado
-if(BUILD_FRONTEND_REACT)
-    add_subdirectory(src/frontend/react)
-endif()
-
-# Configurar ferramentas
-if(BUILD_TOOLS)
-    add_subdirectory(src/tools)
-endif()
+# Configurar testes
+enable_testing()
 
 # Configurar documentação
 find_package(Doxygen)
@@ -113,28 +95,19 @@ if(DOXYGEN_FOUND)
         VERBATIM)
 endif()
 
-# Configurar instalação
-include(GNUInstallDirs)
-install(TARGETS mega_emu
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+# Instalar
+install(TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION bin
+)
+
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/resources/
+    DESTINATION share/${PROJECT_NAME}
 )
 
 # Configurar pacote
-include(CPack)
-set(CPACK_PACKAGE_NAME "mega-emu")
-set(CPACK_PACKAGE_VENDOR "MegaEmu Team")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Multi-platform emulator")
+set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
-set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
-set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
-set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
-set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Emulador multi-plataforma para sistemas retro")
+set(CPACK_PACKAGE_VENDOR "MegaEmu Team")
 
-# Configurar variáveis de versão
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/include/version.h
-)
+include(CPack)

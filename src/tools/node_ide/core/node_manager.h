@@ -1,0 +1,1 @@
+#include <stdint.h>#ifndef EMU_NODE_MANAGER_H#define EMU_NODE_MANAGER_Hemu_status_t emu_node_init(void);EmuNode* emu_node_create(const char* name, emu_node_type_t type);emu_status_t emu_node_connect(uint32_t from_id, uint32_t to_id);void emu_node_update(void);#endif // EMU_NODE_MANAGER_H

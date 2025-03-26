@@ -9,122 +9,53 @@
 #ifndef MD_Z80_ADAPTER_H
 #define MD_Z80_ADAPTER_H
 
-#include <stdint.h>
+#include "../../../core/interfaces/audio_interface.h"
+#include "../../../core/interfaces/cpu_interface.h"
+#include "../../../core/interfaces/memory_interface.h"
+#include "../../../core/interfaces/state_interface.h"
 #include <stdbool.h>
-#include "../memory/memory.h"
-#include "../audio/audio.h"
+#include <stdint.h>
 
-/**
- * @brief Opaque handle para o adaptador Z80 do Mega Drive
- */
-typedef struct md_z80_adapter_s md_z80_adapter_t;
+// Forward declarations
+struct md_z80_adapter_s;
+typedef struct md_z80_adapter_s *md_z80_adapter_t;
 
-/**
- * @brief Cria uma nova instância do adaptador Z80 para o Mega Drive
- *
- * @return Ponteiro para a instância ou NULL em caso de erro
- */
-md_z80_adapter_t* md_z80_adapter_create(void);
+// Estrutura do adaptador Z80
+struct md_z80_adapter_s {
+  emu_cpu_t cpu;       /**< CPU Z80 */
+  emu_memory_t memory; /**< Sistema de memória */
+  emu_audio_t audio;   /**< Sistema de áudio */
+  bool is_reset;       /**< Flag de reset */
+  bool is_busreq;      /**< Flag de bus request */
+  uint16_t bank;       /**< Banco de memória atual */
+};
 
-/**
- * @brief Destrói uma instância do adaptador Z80 e libera recursos
- *
- * @param z80 Ponteiro para a instância
- */
-void md_z80_adapter_destroy(md_z80_adapter_t *z80);
+// Funções de criação/destruição
+md_z80_adapter_t md_z80_adapter_create(void);
+void md_z80_adapter_destroy(md_z80_adapter_t adapter);
 
-/**
- * @brief Reseta o Z80 para o estado inicial
- *
- * @param z80 Ponteiro para a instância
- */
-void md_z80_adapter_reset(md_z80_adapter_t *z80);
+// Funções de controle
+void md_z80_adapter_reset(md_z80_adapter_t adapter);
+void md_z80_adapter_set_reset(md_z80_adapter_t adapter, bool reset);
+void md_z80_adapter_set_busreq(md_z80_adapter_t adapter, bool busreq);
+void md_z80_adapter_set_bank(md_z80_adapter_t adapter, uint16_t bank);
 
-/**
- * @brief Conecta o sistema de memória ao Z80
- *
- * @param z80 Ponteiro para a instância
- * @param memory Ponteiro para o sistema de memória
- * @return true se conectado com sucesso, false caso contrário
- */
-bool md_z80_adapter_connect_memory(md_z80_adapter_t *z80, md_memory_t *memory);
+// Funções de conexão
+void md_z80_adapter_connect_memory(md_z80_adapter_t adapter,
+                                   emu_memory_t memory);
+void md_z80_adapter_connect_audio(md_z80_adapter_t adapter, emu_audio_t audio);
 
-/**
- * @brief Conecta o sistema de áudio ao Z80
- *
- * @param z80 Ponteiro para a instância
- * @param audio Ponteiro para o sistema de áudio
- * @return true se conectado com sucesso, false caso contrário
- */
-bool md_z80_adapter_connect_audio(md_z80_adapter_t *z80, md_audio_t *audio);
+// Funções de execução
+uint32_t md_z80_adapter_run_cycles(md_z80_adapter_t adapter, uint32_t cycles);
 
-/**
- * @brief Executa um passo de instrução no Z80
- *
- * @param z80 Ponteiro para a instância
- * @return Número de ciclos consumidos pela instrução
- */
-uint8_t md_z80_adapter_step(md_z80_adapter_t *z80);
+// Funções de estado
+bool md_z80_adapter_get_reset(md_z80_adapter_t adapter);
+bool md_z80_adapter_get_busreq(md_z80_adapter_t adapter);
+uint16_t md_z80_adapter_get_bank(md_z80_adapter_t adapter);
 
-/**
- * @brief Executa um número específico de ciclos no Z80
- *
- * @param z80 Ponteiro para a instância
- * @param cycles Número de ciclos a executar
- * @return Número real de ciclos executados
- */
-uint32_t md_z80_adapter_run(md_z80_adapter_t *z80, uint32_t cycles);
-
-/**
- * @brief Gera uma interrupção no Z80
- *
- * @param z80 Ponteiro para a instância
- */
-void md_z80_adapter_interrupt(md_z80_adapter_t *z80);
-
-/**
- * @brief Define o estado de reset do Z80
- *
- * No Mega Drive, o 68000 pode resetar o Z80
- *
- * @param z80 Ponteiro para a instância
- * @param reset true para resetar, false para liberar do reset
- */
-void md_z80_adapter_set_reset(md_z80_adapter_t *z80, bool reset);
-
-/**
- * @brief Define o estado de bus request do Z80
- *
- * No Mega Drive, o 68000 pode solicitar o barramento do Z80
- *
- * @param z80 Ponteiro para a instância
- * @param request true para solicitar, false para liberar
- */
-void md_z80_adapter_set_busreq(md_z80_adapter_t *z80, bool request);
-
-/**
- * @brief Obtém o estado atual de bus request do Z80
- *
- * @param z80 Ponteiro para a instância
- * @return true se o barramento está sendo solicitado, false caso contrário
- */
-bool md_z80_adapter_get_busreq(md_z80_adapter_t *z80);
-
-/**
- * @brief Define o banco de memória para o Z80 acessar a memória principal
- *
- * @param z80 Ponteiro para a instância
- * @param bank Banco de memória (0-511)
- */
-void md_z80_adapter_set_bank(md_z80_adapter_t *z80, uint16_t bank);
-
-/**
- * @brief Registra o Z80 no sistema de save state
- *
- * @param z80 Ponteiro para a instância
- * @param state Ponteiro para o contexto de save state
- * @return Código de erro (0 para sucesso)
- */
-int md_z80_adapter_register_save_state(md_z80_adapter_t *z80, save_state_t *state);
+// Funções de save state
+void md_z80_adapter_save_state(md_z80_adapter_t adapter, void *state);
+void md_z80_adapter_register_save_state(md_z80_adapter_t adapter,
+                                        emu_state_t *state);
 
 #endif /* MD_Z80_ADAPTER_H */

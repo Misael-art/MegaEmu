@@ -1,16 +1,14 @@
 ---
 description: rule_for_IA
-globs: /AI_GUIDELINES.md
-alwaysApply: false
+globs: @/docs/AI_GUIDELINE.md
+alwaysApply: True
 ---
-1. SEMPRE consultar e seguir [AI_GUIDELINES.md](mdc:AI_GUIDELINES.md)  antes de qualquer ação
-2. Validar TODAS as solicitações usando a matriz de validação definida
-3. Registrar TODAS as ações no formato de log especificado
-
-PROCESSO OBRIGATÓRIO:
-1. Consultar [AI_GUIDELINES.md](mdc:AI_GUIDELINES.md) 
-2. Executar checklist pré-implementação
-3. Validar em todas as camadas
-4. Gerar log de auditoria
-5. Retornar resultado padronizado
-6. Confirme se deu certo e atualize [ROADMAP.md](mdc:ROADMAP.md)
+1. SEMPRE consultar e seguir @/docs/AI_GUIDELINE.md antes de qualquer ação
+2.  Executar checklist pré-implementação
+3.  Validar em todas as camadas
+4.  Gerar log de auditoria
+5.  Retornar resultado padronizado
+6.  Confirme se deu certo e se possível faça testes
+7.	Lançe a aplicação sempre que ela tiver os requisitos monimos de funcionamento e monitore por 30 segundos avaliando o comportamento e corrigindo inconsistências
+8.  Avalie a necessidade de atualizar @/docs/VERSION.md para manter Histórico de versões atualizado
+9.  Sempre atualize o @/docs/AI_MEMORIA.md para registrar o contexto de atuação recente no PROJETO

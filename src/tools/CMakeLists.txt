@@ -1,1 +1,22 @@
-# CMakeLists.txt para o diretório tools# Coletar arquivos fontefile(GLOB_RECURSE TOOLS_C_SOURCES "*.c")file(GLOB_RECURSE TOOLS_CPP_SOURCES "*.cpp")file(GLOB_RECURSE TOOLS_HEADERS "*.h" "*.hpp")# Biblioteca principal de ferramentasadd_library(mega_emu_tools STATIC    ${TOOLS_C_SOURCES}    ${TOOLS_CPP_SOURCES}    ${TOOLS_HEADERS})target_include_directories(mega_emu_tools    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})# Adicionar subdiretórios com ferramentas executáveisadd_subdirectory(nes_visualizer)# Configurar flags de compilaçãoset_target_properties(mega_emu_tools PROPERTIES    CXX_STANDARD 17    CXX_STANDARD_REQUIRED ON    CXX_EXTENSIONS OFF)# Linkar com bibliotecas necessáriastarget_link_libraries(mega_emu_tools    mega_emu_core)
+cmake_minimum_required(VERSION 3.15)
+
+add_library(mega_tools STATIC
+    src/tools.cpp
+)
+
+target_include_directories(mega_tools PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+set_target_properties(mega_tools PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
+if(MSVC)
+    target_compile_options(mega_tools PRIVATE /W4)
+else()
+    target_compile_options(mega_tools PRIVATE -Wall -Wextra -Wpedantic)
+endif()

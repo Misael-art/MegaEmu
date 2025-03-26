@@ -1,0 +1,89 @@
+[core]
+    autocrlf = input
+    eol = lf
+    whitespace = trailing-space,space-before-tab,indent-with-non-tab
+    excludesfile = .gitignore
+    editor = code --wait
+
+[user]
+    name = Seu Nome
+    email = seu.email@exemplo.com
+    signingkey = sua_chave_gpg
+
+[commit]
+    gpgsign = true
+    template = .gitmessage
+
+[pull]
+    rebase = true
+
+[push]
+    default = current
+    followTags = true
+
+[fetch]
+    prune = true
+
+[branch]
+    autosetuprebase = always
+
+[merge]
+    tool = vscode
+    conflictstyle = diff3
+
+[mergetool "vscode"]
+    cmd = code --wait $MERGED
+
+[diff]
+    tool = vscode
+    colorMoved = default
+
+[difftool "vscode"]
+    cmd = code --wait --diff $LOCAL $REMOTE
+
+[alias]
+    st = status -sb
+    ci = commit
+    co = checkout
+    br = branch
+    unstage = reset HEAD --
+    last = log -1 HEAD
+    visual = !gitk
+    lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+    amend = commit --amend
+    staged = diff --staged
+    tags = tag -l
+    branches = branch -a
+    remotes = remote -v
+    contributors = shortlog --summary --numbered
+    filehistory = log -p --follow -1
+
+[color]
+    ui = auto
+    diff = auto
+    status = auto
+    branch = auto
+    interactive = auto
+
+[init]
+    defaultBranch = main
+
+[filter "lfs"]
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
+
+[credential]
+    helper = manager-core
+
+[http]
+    postBuffer = 524288000
+
+[pack]
+    windowMemory = 100m
+    packSizeLimit = 100m
+    threads = 1
+
+[help]
+    autocorrect = 1

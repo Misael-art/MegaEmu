@@ -1,96 +1,154 @@
-# Source directory CMakeLists.txt
+cmake_minimum_required(VERSION 3.15)
+project(mega_emu VERSION 1.0.0)
 
-# Verificar dependências SDL2
-if(USE_SDL2)
-    if(NOT SDL2_FOUND)
-        message(FATAL_ERROR "SDL2 não encontrado. Verifique se vcpkg está configurado corretamente.")
-    else()
-        message(STATUS "SDL2 encontrado e configurado corretamente")
-    endif()
-
-    # Configurar opções de SDL2_ttf
-    if(SDL2_ttf_FOUND)
-        add_definitions(-DUSE_SDL2_TTF)
-        message(STATUS "SDL2_ttf encontrado - recursos de texto avançados habilitados")
-    else()
-        message(STATUS "SDL2_ttf não encontrado - recursos de texto avançados desabilitados")
-    endif()
+# Configurar vcpkg se VCPKG_ROOT estiver definido
+if(DEFINED ENV{VCPKG_ROOT})
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
 endif()
 
-# Configuração de compilação para os componentes do emulador
-message(STATUS "Configurando componentes do Mega_Emu...")
+# Configurar opções do compilador
+if(MSVC)
+    add_compile_options(/W4)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
-# Adicionar subdiretórios
-add_subdirectory(core)
-add_subdirectory(utils)
-add_subdirectory(frontend)
-add_subdirectory(platforms)
+# Definir opções de build
+option(BUILD_NES "Build NES emulator" ON)
+option(BUILD_MEGADRIVE "Build Mega Drive emulator" ON)
+option(BUILD_SDL_FRONTEND "Build SDL frontend" ON)
 
-# Definir fontes do projeto principal
-set(SOURCES
-    main.cpp)
+# Configurar diretórios de saída
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-# Criar executável principal
-add_executable(mega_emu ${SOURCES})
+# Encontrar pacotes necessários
+find_package(OpenGL REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(PNG REQUIRED)
+find_package(JPEG REQUIRED)
+find_package(Freetype REQUIRED)
 
-# Incluir diretórios
-target_include_directories(mega_emu PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/frontend
-    ${CMAKE_CURRENT_SOURCE_DIR}/core
-    ${CMAKE_CURRENT_SOURCE_DIR}/platforms
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils)
+# Verificar SDL2
+find_path(SDL2_INCLUDE_DIR SDL.h PATH_SUFFIXES SDL2)
+find_package(SDL2 CONFIG REQUIRED)
+message(STATUS "SDL2 encontrado em: ${SDL2_DIR}")
 
-# Configurar C++17
-set_target_properties(mega_emu PROPERTIES
+# Adicionar Unity para testes
+add_subdirectory(${CMAKE_SOURCE_DIR}/deps/third_party/Unity ${CMAKE_BINARY_DIR}/Unity)
+
+# Adicionar biblioteca de ferramentas
+add_library(mega_tools STATIC
+    tools/src/tools.cpp
+)
+
+target_include_directories(mega_tools PUBLIC
+    ${CMAKE_SOURCE_DIR}/tools/include
+)
+
+# Configurar propriedades da biblioteca de ferramentas
+set_target_properties(mega_tools PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF)
+    CXX_EXTENSIONS OFF
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
 
-# Configurar bibliotecas base
-set(MEGA_EMU_LIBS
-    mega_emu_core
-    mega_emu_utils
-    mega_emu_platforms
-    mega_emu_frontend)
+if(MSVC)
+    target_compile_options(mega_tools PRIVATE /W4)
+else()
+    target_compile_options(mega_tools PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 
-# Adicionar SDL2 se disponível
-if(USE_SDL2 AND SDL2_FOUND)
-    list(APPEND MEGA_EMU_LIBS SDL2::SDL2)
-    if(SDL2_ttf_FOUND)
-        list(APPEND MEGA_EMU_LIBS SDL2_ttf::SDL2_ttf)
+# Adicionar emulador NES
+if(BUILD_NES)
+    add_executable(mega_emu_nes
+        emulators/nes/src/nes.cpp
+    )
+
+    target_link_libraries(mega_emu_nes PRIVATE
+        mega_tools
+    )
+
+    set_target_properties(mega_emu_nes PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+
+    if(MSVC)
+        target_compile_options(mega_emu_nes PRIVATE /W4)
+    else()
+        target_compile_options(mega_emu_nes PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()
 
-# Linkar bibliotecas
-target_link_libraries(mega_emu PRIVATE ${MEGA_EMU_LIBS})
+# Adicionar emulador Mega Drive
+if(BUILD_MEGADRIVE)
+    add_executable(mega_emu_megadrive
+        emulators/megadrive/src/megadrive.cpp
+    )
 
-# Definir flags de compilação
-target_compile_definitions(mega_emu PRIVATE
-    $<$<BOOL:${USE_SDL2}>:USE_SDL2>
-    $<$<BOOL:${SDL2_ttf_FOUND}>:USE_SDL2_TTF>
-    SDL_MAIN_HANDLED)
+    target_link_libraries(mega_emu_megadrive PRIVATE
+        mega_tools
+    )
 
-# Copiar DLLs do SDL2 para Windows
-if(WIN32 AND USE_SDL2 AND SDL2_FOUND)
-    add_custom_command(TARGET mega_emu POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<TARGET_FILE:SDL2::SDL2>
-        $<TARGET_FILE_DIR:mega_emu>)
+    set_target_properties(mega_emu_megadrive PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
 
-    if(SDL2_ttf_FOUND)
-        add_custom_command(TARGET mega_emu POST_BUILD
+    if(MSVC)
+        target_compile_options(mega_emu_megadrive PRIVATE /W4)
+    else()
+        target_compile_options(mega_emu_megadrive PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endif()
+
+# Adicionar frontend SDL
+if(BUILD_SDL_FRONTEND)
+    add_executable(mega_emu_sdl_frontend
+        frontend/sdl/src/main.cpp
+    )
+
+    target_link_libraries(mega_emu_sdl_frontend PRIVATE
+        mega_tools
+        SDL2::SDL2
+        SDL2::SDL2main
+        OpenGL::GL
+        ZLIB::ZLIB
+        PNG::PNG
+        JPEG::JPEG
+        Freetype::Freetype
+    )
+
+    set_target_properties(mega_emu_sdl_frontend PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+
+    if(MSVC)
+        target_compile_options(mega_emu_sdl_frontend PRIVATE /W4)
+
+        # Copiar DLLs do SDL2 para o diretório de saída no Windows
+        add_custom_command(TARGET mega_emu_sdl_frontend POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:SDL2_ttf::SDL2_ttf>
-            $<TARGET_FILE_DIR:mega_emu>)
+                $<TARGET_FILE:SDL2::SDL2>
+                $<TARGET_FILE_DIR:mega_emu_sdl_frontend>
+        )
+    else()
+        target_compile_options(mega_emu_sdl_frontend PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()
 
-# Configurar diretório de saída
-set_target_properties(mega_emu PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-
-# Lista de bibliotecas do projeto
-set(MEGA_EMU_LIBRARIES
-    ${MEGA_EMU_LIBS}
-    PARENT_SCOPE)
+# Adicionar subdiretórios
+add_subdirectory(core/cpu)
+add_subdirectory(core/video)
+add_subdirectory(frontend/sdl)
+add_subdirectory(platforms/megadrive)

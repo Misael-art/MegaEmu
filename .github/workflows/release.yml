@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+  build:
+    name: Build Release on ${{ matrix.os }}
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: mega_emu
+            asset_name: mega_emu-linux-x86_64
+          - os: windows-latest
+            artifact_name: mega_emu.exe
+            asset_name: mega_emu-windows-x86_64.exe
+          - os: macos-latest
+            artifact_name: mega_emu
+            asset_name: mega_emu-macos-x86_64
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          libsdl2-dev \
+          liblua5.4-dev \
+          libboost-all-dev
+
+    - name: Install Dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install \
+          cmake \
+          ninja \
+          sdl2 \
+          lua@5.4 \
+          boost
+
+    - name: Install Dependencies (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        vcpkg install sdl2:x64-windows
+        vcpkg install lua:x64-windows
+        vcpkg install boost-system:x64-windows
+        vcpkg install boost-filesystem:x64-windows
+        vcpkg integrate install
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+    - name: Build
+      run: cmake --build build --config Release --parallel
+
+    - name: Run Tests
+      run: |
+        cd build
+        ctest --output-on-failure --verbose
+
+    - name: Create Distribution
+      run: |
+        mkdir dist
+        cp build/${{ matrix.artifact_name }} dist/
+        cp -r resources dist/
+        cp README.md LICENSE dist/
+
+    - name: Create Archive
+      run: |
+        cd dist
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          7z a ../${{ matrix.asset_name }}.zip .
+        else
+          tar -czf ../${{ matrix.asset_name }}.tar.gz .
+        fi
+      shell: bash
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./${{ matrix.asset_name }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
+        asset_name: ${{ matrix.asset_name }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
+        asset_content_type: ${{ matrix.os == 'windows-latest' && 'application/zip' || 'application/gzip' }}

@@ -1,0 +1,48 @@
+# <tipo>(<escopo>): <descrição curta>
+# |<----  Usar no máximo 50 caracteres  ---->|
+
+# Explicação detalhada, se necessária
+# |<----   Tentar limitar cada linha a 72 caracteres   ---->|
+
+# * feat     : Uma nova funcionalidade
+# * fix      : Correção de bug
+# * docs     : Alterações na documentação
+# * style    : Formatação, ponto e vírgula faltando, etc; Sem alteração de código
+# * refactor : Refatoração do código de produção
+# * test     : Adição de testes, refatoração de testes; Sem alteração de código
+# * chore    : Atualização de tarefas de build, configurações de pacotes, etc
+#              Sem alteração de código
+# * perf     : Alterações relacionadas a performance
+# * ci       : Alterações nos arquivos de CI
+# * build    : Alterações que afetam o sistema de build ou dependências externas
+# * revert   : Reverte um commit anterior
+#
+# Escopo:  core | cpu | ppu | apu | frontend | tests | docs | build | ci | deps
+#
+# Exemplo:
+# feat(cpu): adiciona suporte para instruções de multiplicação
+#
+# - Implementa as instruções MUL e MULU
+# - Adiciona testes para verificar o comportamento
+# - Atualiza a documentação com os novos opcodes
+#
+# Resolves: #123
+# See also: #456, #789
+#
+# * Lembre-se de:
+#   * Usar o imperativo na descrição: "adiciona", não "adicionado" ou "adicionando"
+#   * Primeira linha deve ter no máximo 50 caracteres
+#   * Segunda linha deve estar em branco
+#   * Demais linhas devem ter no máximo 72 caracteres
+#   * Descrever o que e por que, não como
+#   * Incluir número de issue se aplicável
+#   * Incluir breaking changes se houver
+#   * Incluir deprecated features se houver
+#   * Incluir migration notes se necessário
+#   * Incluir referências a outros commits ou issues se relevante
+#
+# Para mais informações sobre conventional commits:
+# https://www.conventionalcommits.org/
+#
+# Para remover este template, execute:
+# git config --global commit.template ""

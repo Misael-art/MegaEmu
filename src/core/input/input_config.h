@@ -1,0 +1,1 @@
+#ifndef EMU_INPUT_CONFIG_H#define EMU_INPUT_CONFIG_H#ifdef __cplusplusextern "C"{#endif#include <stdint.h>#include <stdbool.h>#include "input_config_interface.h"    /*     * Este arquivo é apenas um wrapper para input_config_interface.h     * A implementação completa está em input_config.c     */#ifdef __cplusplus}#endif#endif // EMU_INPUT_CONFIG_H

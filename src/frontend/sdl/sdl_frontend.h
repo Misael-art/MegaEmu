@@ -1,1 +1,27 @@
-#ifndef SDL_FRONTEND_H#define SDL_FRONTEND_H#include <stdbool.h>#include <stdint.h>#include "frontend/common/frontend_config.h"// Funções do frontend SDLbool sdl_frontend_init(const emu_frontend_config_t *config);void sdl_frontend_shutdown(void);bool sdl_frontend_process_events(void);void sdl_frontend_render_frame(const uint32_t *framebuffer, const int16_t *audio_samples, int32_t num_samples);bool sdl_frontend_is_running(void);uint8_t sdl_frontend_get_controller_state(int32_t controller);void sdl_frontend_toggle_fullscreen(void);void sdl_frontend_set_title(const char *title);float sdl_frontend_get_fps(void);#endif // SDL_FRONTEND_H
+/**
+ * @file sdl_frontend.h
+ * @brief Interface do frontend SDL
+ */
+#ifndef SDL_FRONTEND_H
+#define SDL_FRONTEND_H
+
+#include <SDL2/SDL.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+// Estrutura do frontend SDL
+typedef struct {
+    SDL_Window* window;
+    SDL_Renderer* renderer;
+    SDL_Texture* texture;
+    bool running;
+    int scale;
+} SDLFrontend;
+
+// Funções do frontend SDL
+bool sdl_frontend_init(SDLFrontend* frontend, const char* title, int width, int height, int scale);
+void sdl_frontend_update(SDLFrontend* frontend, uint32_t* framebuffer, int width, int height);
+bool sdl_frontend_handle_events(SDLFrontend* frontend);
+void sdl_frontend_destroy(SDLFrontend* frontend);
+
+#endif  // SDL_FRONTEND_H

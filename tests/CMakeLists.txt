@@ -190,5 +190,66 @@ add_custom_target(documentation
     COMMENT "Executando testes de documentação"
 )
 
+# Adicionar arquivos fonte dos testes
+file(GLOB_RECURSE TEST_SOURCES
+    "*.c"
+    "*.cpp"
+)
+
+# Criar executável de testes
+add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES})
+
+# Vincular bibliotecas
+target_link_libraries(${PROJECT_NAME}_tests
+    ${SDL2_LIBRARIES}
+    ${LUA_LIBRARIES}
+    ${Boost_LIBRARIES}
+)
+
+# Adicionar testes
+add_test(NAME cpu_tests COMMAND ${PROJECT_NAME}_tests --gtest_filter=CpuTest.*)
+add_test(NAME video_tests COMMAND ${PROJECT_NAME}_tests --gtest_filter=VideoTest.*)
+add_test(NAME audio_tests COMMAND ${PROJECT_NAME}_tests --gtest_filter=AudioTest.*)
+add_test(NAME memory_tests COMMAND ${PROJECT_NAME}_tests --gtest_filter=MemoryTest.*)
+
 message(STATUS "Configuração de testes concluída")
 message(STATUS "Execute 'ctest' para rodar todos os testes")
+
+# Configuração do Google Test
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG release-1.12.1
+)
+FetchContent_MakeAvailable(googletest)
+
+# Habilitar testes
+enable_testing()
+
+# Adicionar diretórios de testes
+add_subdirectory(unit)
+add_subdirectory(integration)
+add_subdirectory(performance)
+
+# Configurações comuns para todos os testes
+set(TEST_COMMON_LIBS
+    gtest
+    gtest_main
+    mega_emu_cpu
+    mega_emu_ppu
+    mega_emu_frontend_sdl
+    mega_emu_megadrive_platform
+)
+
+# Configurações de compilação para testes
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Incluir diretórios
+include_directories(
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/frontend
+    ${CMAKE_SOURCE_DIR}/src/platforms
+)

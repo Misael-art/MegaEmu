@@ -1,0 +1,95 @@
+{
+    "video": {
+        "window_width": 640,
+        "window_height": 480,
+        "fullscreen": false,
+        "vsync": true,
+        "shader_enabled": false,
+        "bilinear_filter": false,
+        "shader_path": "shaders/default.glsl"
+    },
+    "audio": {
+        "enabled": true,
+        "volume": 100,
+        "sample_rate": 44100,
+        "buffer_size": 2048
+    },
+    "input": {
+        "deadzone": 8000,
+        "mappings": [
+            {
+                "device": 0,
+                "button": 0
+            },
+            {
+                "device": 0,
+                "button": 1
+            },
+            {
+                "device": 0,
+                "button": 2
+            },
+            {
+                "device": 0,
+                "button": 3
+            },
+            {
+                "device": 0,
+                "button": 4
+            },
+            {
+                "device": 0,
+                "button": 5
+            },
+            {
+                "device": 0,
+                "button": 6
+            },
+            {
+                "device": 0,
+                "button": 7
+            },
+            {
+                "device": 0,
+                "button": 8
+            },
+            {
+                "device": 0,
+                "button": 9
+            },
+            {
+                "device": 0,
+                "button": 10
+            },
+            {
+                "device": 0,
+                "button": 11
+            },
+            {
+                "device": 0,
+                "button": 12
+            },
+            {
+                "device": 0,
+                "button": 13
+            },
+            {
+                "device": 0,
+                "button": 14
+            },
+            {
+                "device": 0,
+                "button": 15
+            }
+        ]
+    },
+    "system": {
+        "save_state_slots": 10,
+        "auto_save_interval": 300,
+        "rewind_enabled": true,
+        "rewind_buffer_size": 60,
+        "save_path": "saves",
+        "screenshot_path": "screenshots",
+        "bios_path": "bios"
+    }
+}

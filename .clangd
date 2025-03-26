@@ -1,0 +1,47 @@
+CompileFlags:
+  Add: [-Wall, -Wextra, -Wpedantic, -Werror, -std=c++17]
+  Remove: [-W*, -std*]
+
+Diagnostics:
+  ClangTidy:
+    Add: [performance-*, modernize-*, readability-*, bugprone-*, clang-analyzer-*, cppcoreguidelines-*]
+    Remove: [modernize-use-trailing-return-type]
+    CheckOptions:
+      readability-identifier-naming.NamespaceCase: lower_case
+      readability-identifier-naming.ClassCase: CamelCase
+      readability-identifier-naming.StructCase: CamelCase
+      readability-identifier-naming.FunctionCase: lower_case
+      readability-identifier-naming.VariableCase: lower_case
+      readability-identifier-naming.GlobalConstantCase: UPPER_CASE
+      readability-identifier-naming.EnumCase: CamelCase
+      readability-identifier-naming.EnumConstantCase: UPPER_CASE
+      readability-identifier-length.MinimumVariableNameLength: 3
+      readability-identifier-length.MinimumParameterNameLength: 3
+      readability-function-cognitive-complexity.Threshold: 25
+
+Index:
+  Background: Build
+  StandardLibrary: Yes
+
+InlayHints:
+  Enabled: Yes
+  ParameterNames: Yes
+  DeducedTypes: Yes
+  Designators: Yes
+
+Hover:
+  ShowAKA: Yes
+
+Completion:
+  AllScopes: Yes
+
+---
+If:
+  PathMatch: [src/.*\.(cpp|hpp|h)$]
+CompileFlags:
+  Add: [-DDEBUG]
+---
+If:
+  PathMatch: [tests/.*\.(cpp|hpp|h)$]
+CompileFlags:
+  Add: [-DTESTING]

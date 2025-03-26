@@ -9,15 +9,25 @@
 *.exe
 
 # Diretórios de build
-build/*
-!build/.gitkeep
-!build/*/
-build/*/[^.]*
-!build/*/.gitkeep
+/build/
+/install/
+/out/
+/bin/
+/lib/
+/Debug/
+/Release/
+/x64/
+/x86/
+/Win32/
+/ARM/
+/ARM64/
 
 # Diretórios e arquivos do CMake
-CMakeFiles/
 CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
@@ -32,37 +42,168 @@ _deps/
 Thumbs.db
 
 # Arquivos de configuração e cache de IDEs
-.vscode/
-.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+*.vsix
+
+# Arquivos de configuração do Visual Studio
 .vs/
-*.user
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
 *.suo
+*.user
+*.userosscache
 *.sdf
 *.opensdf
-*.db
-*.opendb
 *.VC.db
+*.VC.VC.opendb
 ipch/
-.settings/
-.clangd
+*.aps
+*.ncb
+*.opendb
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# Arquivos de configuração do Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+*.vsix
+
+# Arquivos de configuração do CLion
+.idea/
+cmake-build-*/
+*.iws
+*.iml
+*.ipr
+
+# Arquivos de dependências
+vcpkg_installed/
+packages/
+node_modules/
+
+# Arquivos de cache
+.cache/
+__pycache__/
+*.py[cod]
+*$py.class
 
 # Arquivos de log
 *.log
+log/
+logs/
 
-# Diretórios e arquivos específicos do projeto
-.cursor/cache/
-.model_activity_log.txt
+# Arquivos temporários
+*.tmp
+*.temp
+*.swp
+*~
+.DS_Store
+Thumbs.db
 
-# Arquivos de estado de depuração
-*.dmp
-core
+# Arquivos de cobertura de código
+*.gcno
+*.gcda
+*.gcov
+coverage/
+coverage.xml
+.coverage
+htmlcov/
+
+# Arquivos de documentação gerados
+/docs/html/
+/docs/latex/
+/docs/xml/
+/docs/man/
+/docs/rtf/
+/docs/doxygen/
+
+# Arquivos de ROMs
+/roms/*
+!/roms/README.md
+!/roms/test.md
+
+# Arquivos de configuração local
+.env
+.env.local
+.env.*.local
+config.local.json
+settings.local.json
+
+# Arquivos de backup
+*.bak
+*.backup
+*.old
+*.orig
+*.rej
+
+# Arquivos de sistema
+$RECYCLE.BIN/
+System Volume Information/
+.Trash-*/
 
 # Arquivos de IDE
-.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+.loadpath
+.recommenders/
+.metadata/
+.buildpath
+nbproject/
+.nb-gradle/
+
+# Arquivos de profiling
+*.prof
+*.heap
+*.heapprofile
+*.cpuprofile
+
+# Arquivos de teste
+test-results/
+test-coverage/
+test-report/
+junit.xml
+test-output/
+
+# Arquivos de distribuição
+dist/
+release/
+
+# Arquivos específicos do projeto
+*.user.config
+*.local.json
+*.private.json
+*.secret.json
+
+# Arquivos de IDE
+.vs/
 .vscode/
 *.swp
 *.swo
 *~
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.usertasks
 
 # Arquivos de compilação
 *.o
@@ -71,183 +212,169 @@ core
 *.dll
 *.so
 *.dylib
+*.lib
+*.a
+*.pdb
+*.ilk
+*.exp
+*.map
+*.gcno
+*.gcda
+*.gcov
 
-# Arquivos de dependência
+# Arquivos de cache
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+.cache/
+
+# Arquivos de dependências
 vcpkg_installed/
-conan.lock
-conanbuildinfo.cmake
-conanbuildinfo.txt
+deps/third_party/*/
 
-# Arquivos de documentação
-docs/html/
-docs/latex/
+# Arquivos de ROMs
+roms/
+*.md
+*.sms
+*.gg
+*.nes
+*.sfc
+*.gb
+*.gbc
+*.gba
 
-# Arquivos de log
+# Arquivos de log e debug
 *.log
+debug/
 logs/
 
-# Arquivos de teste
-test_results/
-coverage/
-*.gcda
-*.gcno
-*.gcov
+# Arquivos temporários
+temp/
+tmp/
+*.tmp
 
 # Arquivos de sistema
 .DS_Store
 Thumbs.db
 
-# Arquivos de ROM e save
-*.rom
-*.bin
-*.sav
-*.state
+# Arquivos de build
+build/
+bin/
+lib/
+out/
+cmake-build-*/
+
+# Arquivos de IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*.user
+*.suo
+*.sln.docstates
+*.userprefs
+*.usertasks
+
+# Arquivos de compilação
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.pdb
+*.ilk
+*.exp
+*.map
+*.gcno
+*.gcda
+*.gcov
+
+# Arquivos de dependência
+deps/
+vcpkg/
+packages/
 
 # Arquivos temporários
 *.tmp
 *.temp
 *.bak
 *.backup
+*.log
+*.cache
+.DS_Store
+Thumbs.db
 
-# Specific build directories to ignore
-build/temp/*
-!build/temp/.gitkeep
-build/test/*
-!build/test/.gitkeep
-build/emulators/*/*
-!build/emulators/*/.gitkeep
-build/frontend/*/*
-!build/frontend/*/.gitkeep
-build/Mega_tools/*
-!build/Mega_tools/.gitkeep
-build/released/*/*
-!build/released/*/.gitkeep
+# Arquivos de configuração local
+compile_commands.json
+CMakeUserPresets.json
+.clangd/
+.cache/
+
+# Arquivos de ROM
+*.nes
+*.md
+*.sms
+*.gg
+*.sav
+*.state
+
+# Outros
+*.zip
+*.tar.gz
+*.tar.bz2
+*.rar
+*.7z
+
+# Build directories
+build/
+bin/
+out/
 
 # CMake files
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
-Makefile
-*.cmake
-!CMakeLists.txt
+compile_commands.json
 
-# Visual Studio files
+# IDE files
 .vs/
-*.sln
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
-Debug/
-Release/
-x64/
-Win32/
-
-# vcpkg
-vcpkg_installed/
-.vcpkg/
-
-# Dependency directories
-deps/build/
-deps/downloads/
-
-# IDE specific files
-.vscode/
-.idea/
-*.suo
-*.user
-*.userosscache
-*.sdf
-*.opensdf
-*.VC.db
-*.VC.VC.opendb
-
-# OS specific files
-.DS_Store
-Thumbs.db
-node_modules
-
-# Dependências
-node_modules/
-vendor/
-.pnp
-.pnp.js
-
-# Arquivos de build
-build/
-dist/
-out/
-*.exe
-*.dll
-*.so
-*.dylib
-
-# Arquivos de cache
-.cache/
-.next/
-.nuxt/
-.vuepress/dist
-.temp/
-.docusaurus
-
-# Arquivos de ambiente
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Arquivos do sistema
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# IDEs e editores
-.idea/
 .vscode/
 *.swp
 *.swo
-*.swn
-*.bak
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.vcxproj.filters
 
-# Arquivos de teste
-coverage/
-.nyc_output/
+# Dependencies
+vcpkg/
+vcpkg_installed/
 
-# Arquivos de debug
+# ROMs
+*.md
+*.bin
+*.gen
+*.smd
+
+# Debug files
 *.pdb
 *.ilk
 *.exp
+*.lib
+*.dll
 
-# Arquivos temporários
-*.tmp
-*.temp
-temp/
-tmp/
-
-# ROMs e saves
-roms/
-saves/
-*.sav
-*.state
-
-# Arquivos específicos do projeto
-frontend/node_modules/
-frontend/build/
-frontend/dist/
-tests/build/
-tests/temp/
-
-# Arquivos de chaves e configuração
-*.keys.json
-gcp-oauth.keys.json
-config.json
-
-# Arquivos de workspace específicos
-*.code-workspace
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

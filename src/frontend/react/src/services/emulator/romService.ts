@@ -199,7 +199,7 @@ class RomService {
                 }
 
                 // Detecta o tipo de console pelo nome do diretório
-                let consoleType = this.detectConsoleFromDir(consoleDir);
+                let consoleType = this.detectConsoleType(consoleDir, "dummy.rom");
 
                 // Lista os arquivos de ROM no diretório
                 const romFiles = fs.readdirSync(consolePath);
@@ -261,27 +261,6 @@ class RomService {
             // Se ocorrer um erro, retorna dados simulados
             return mockRoms;
         }
-    }
-
-    /**
-     * Detecta o tipo de console a partir do nome do diretório
-     */
-    private detectConsoleFromDir(dirName: string): ConsoleType | null {
-        const normalizedName = dirName.toLowerCase();
-
-        // Verificar se o nome do diretório está diretamente nos aliases
-        if (consoleAliases[normalizedName]) {
-            return consoleAliases[normalizedName];
-        }
-
-        // Verificar também por correspondências parciais (ex: "Master System" corresponde a "mastersystem")
-        for (const [alias, consoleType] of Object.entries(consoleAliases)) {
-            if (normalizedName.includes(alias.toLowerCase()) || alias.toLowerCase().includes(normalizedName)) {
-                return consoleType;
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -465,7 +444,7 @@ class RomService {
             const baseName = path.basename(fileName, path.extname(fileName));
 
             // Detecta o tipo de console
-            const consoleType = this.detectConsoleFromDir(consoleDir);
+            const consoleType = this.detectConsoleType(consoleDir, fileName);
 
             if (!consoleType) {
                 envLogger.error(`Não foi possível determinar o tipo de console para: ${romPath}`);

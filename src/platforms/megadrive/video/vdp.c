@@ -1,1 +1,424 @@
-/** * @file vdp.c * @brief Implementação do VDP (Video Display Processor) do Mega Drive */#include <stdio.h>#include <stdlib.h>#include <string.h>#include <time.h>#include <stdint.h>#include "vdp.h"#include "utils/log_utils.h"#include "utils/validation_utils.h"// Flag para ativar log detalhado (usado em debug)#define VDP_LOG_ENABLED 0#define VDP_LOG_LEVEL_INFO 0#define VDP_LOG_LEVEL_WARNING 1#define VDP_LOG_LEVEL_ERROR 2// Variável global para nível de logstatic int g_vdp_log_level = VDP_LOG_LEVEL_ERROR;// Instância global do estado do VDPstatic md_vdp_state_t g_vdp;/** * @brief Obtém a interface de vídeo do VDP */emu_video_interface_t md_vdp_get_interface(void){    emu_video_interface_t interface;    memset(&interface, 0, sizeof(emu_video_interface_t));    // Preenchendo a interface com as funções do VDP    interface.init = md_vdp_init;    interface.reset = md_vdp_reset;    interface.update = md_vdp_update;    interface.render_frame = md_vdp_render_frame;    interface.read_data = md_vdp_read_data;    interface.write_data = md_vdp_write_data;    interface.read_control = md_vdp_read_control;    interface.write_control = md_vdp_write_control;    interface.read_register = md_vdp_read_register;    interface.write_register = md_vdp_write_register;    return interface;}/** * @brief Inicializa o VDP * * @return 0 em caso de sucesso, código de erro em caso de falha */int md_vdp_init(void){    LOG_INFO("Iniciando subsistema VDP");    // Limpar toda a estrutura de estado do VDP    memset(&g_vdp, 0, sizeof(md_vdp_state_t));    LOG_DEBUG("Inicializando memórias VRAM, CRAM e VSRAM");    // Inicializar vram, cram e vsram com zeros    memset(g_vdp.vram, 0, VRAM_SIZE);    memset(g_vdp.cram, 0, CRAM_SIZE);    memset(g_vdp.vsram, 0, VSRAM_SIZE);    LOG_DEBUG("Inicializando registradores do VDP");    // Inicializar registradores com valores padrão    memset(g_vdp.registers, 0, VDP_REG_COUNT);    // Inicializar estado de acesso    g_vdp.state = VDP_STATE_IDLE;    g_vdp.command_word = 0;    g_vdp.transfer_address = 0;    g_vdp.code = VDP_CODE_INVALID;    // Inicializar estado de DMA    g_vdp.dma_enabled = 0;    g_vdp.dma_source = 0;    g_vdp.dma_length = 0;    // Inicializar contadores    g_vdp.h_counter = 0;    g_vdp.v_counter = 0;    g_vdp.frame_complete = 0;    // Inicializar estado de interrupções    g_vdp.vint_pending = 0;    g_vdp.hint_pending = 0;    g_vdp.vint_enabled = 0;    g_vdp.hint_enabled = 0;    g_vdp.hint_counter = 0;    g_vdp.hint_value = 0;    g_vdp.interrupt_callback = NULL;    g_vdp.interrupt_userdata = NULL;    // Inicializar flags de estado    g_vdp.is_initialized = 1;    g_vdp.is_pal = 0; // Padrão: NTSC    LOG_DEBUG("Configurando parâmetros de temporização NTSC");    // Inicializar temporização    g_vdp.cycles_per_line = 3420;          // Para NTSC    g_vdp.lines_per_frame = 262;           // Para NTSC    g_vdp.active_lines = 224;              // Para NTSC    g_vdp.active_start = 24;               // Para NTSC    g_vdp.screen_height = 224;             // Para NTSC    g_vdp.frame_cycles = 53693175 * 6 / 7; // Ciclos para NTSC    LOG_DEBUG("Inicializando efeitos avançados");    // Inicializar efeitos avançados    g_vdp.advanced_effects.mosaic_enabled = 0;    g_vdp.advanced_effects.mosaic_factor_x = 1;    g_vdp.advanced_effects.mosaic_factor_y = 1;    g_vdp.advanced_effects.scanline_enabled = 0;    g_vdp.advanced_effects.scanline_opacity = 0;    g_vdp.advanced_effects.crt_curvature = 0;    g_vdp.advanced_effects.blur_factor = 0;    g_vdp.advanced_effects.noise_factor = 0;    // Marcar como totalmente inicializado    g_vdp.is_fully_initialized = 1;    LOG_INFO("Subsistema VDP inicializado com sucesso");    return 0;}/** * @brief Reseta o VDP */void md_vdp_reset(void){    LOG_INFO("Resetando subsistema VDP");    // Verificar se o VDP está inicializado    if (!g_vdp.is_initialized)    {        LOG_WARNING("Tentativa de resetar VDP não inicializado");        return;    }    // Preservar alguns campos de configuração    int is_pal = g_vdp.is_pal;    int screen_height = g_vdp.screen_height;    uint32_t frame_cycles = g_vdp.frame_cycles;    uint32_t debug_flags = g_vdp.debug_flags;    int scanline_enabled = g_vdp.advanced_effects.scanline_enabled;    int scanline_opacity = g_vdp.advanced_effects.scanline_opacity;    LOG_DEBUG("Preservando configurações: PAL=%d, Height=%d, Debug=0x%08X",              is_pal, screen_height, debug_flags);    // Resetar o estado do VDP    md_vdp_init();    // Restaurar configurações preservadas    g_vdp.is_pal = is_pal;    g_vdp.screen_height = screen_height;    g_vdp.frame_cycles = frame_cycles;    g_vdp.debug_flags = debug_flags;    g_vdp.advanced_effects.scanline_enabled = scanline_enabled;    g_vdp.advanced_effects.scanline_opacity = scanline_opacity;    LOG_INFO("Subsistema VDP resetado com sucesso");}/** * @brief Atualiza o estado do VDP por um número de ciclos */void md_vdp_update(int cycles){    // Atualização básica para compilação    g_vdp.mclk_counter += cycles;    // Lógica simplificada para atualização de linha/frame    int line_cycles = g_vdp.cycles_per_line;    if (g_vdp.mclk_counter >= line_cycles)    {        g_vdp.mclk_counter -= line_cycles;        g_vdp.v_counter++;        if (g_vdp.v_counter >= g_vdp.lines_per_frame)        {            g_vdp.v_counter = 0;            g_vdp.frame_complete = 1;        }    }}/** * @brief Renderiza um frame completo do VDP * * @param framebuffer Buffer para os dados do frame * @param width Largura do framebuffer * @param height Altura do framebuffer */void md_vdp_render_frame(uint32_t *framebuffer, int width, int height){    // Verificações de nulidade e parâmetros    CHECK_NULL_RETURN_VOID(framebuffer, "Framebuffer nulo passado para md_vdp_render_frame");    VALIDATE_PARAM_RETURN_VOID(width > 0 && height > 0,                               "Dimensões inválidas para md_vdp_render_frame: %dx%d",                               width, height);    // Verificar se o tamanho do framebuffer está nos limites    VALIDATE_PARAM_RETURN_VOID(width <= 1024 && height <= 768,                               "Dimensões de framebuffer excedem máximos suportados: %dx%d",                               width, height);    // Verificar se o VDP está totalmente inicializado    if (!g_vdp.is_fully_initialized)    {        LOG_ERROR("Tentativa de renderização antes da inicialização completa do VDP");        // Para fins de debug, renderizar uma tela de teste com verificação de limites        for (int y = 0; y < height; y++)        {            for (int x = 0; x < width; x++)            {                // Verificar limites do framebuffer (redundante, mas por segurança)                if (y >= 0 && y < height && x >= 0 && x < width)                {                    // Criar um padrão de gradiente para mostrar que está funcionando                    uint8_t r = (uint8_t)(x * 255 / width);                    uint8_t g = (uint8_t)(y * 255 / height);                    uint8_t b = 128;                    framebuffer[y * width + x] = (r << 16) | (g << 8) | b;                }            }        }        return;    }    LOG_DEBUG("Renderizando frame VDP %dx%d", width, height);    // Cores básicas para os planos (simplificado)    const uint32_t bg_color = 0x000040;      // Azul escuro para fundo    const uint32_t plane_a_color = 0x008000; // Verde para plano A    const uint32_t plane_b_color = 0x800000; // Vermelho para plano B    const uint32_t sprite_color = 0xFFFF00;  // Amarelo para sprites    // Limpar o framebuffer com a cor de fundo com verificação de limites    for (int i = 0; i < width * height; i++)    {        framebuffer[i] = bg_color;    }    // Renderizar planos (simplificado - apenas áreas coloridas para demonstração)    // Plano B (fundo)    for (int y = 50; y < height - 50 && y < 220; y++)    {        for (int x = 50; x < width - 50 && x < 270; x++)        {            // Verificar limites do framebuffer (redundante, mas por segurança)            if (y >= 0 && y < height && x >= 0 && x < width)            {                // Calcular índice com verificação                const int index = y * width + x;                if (index >= 0 && index < width * height)                {                    // Desenhar um padrão de grade no plano B                    if ((x % 32 == 0) || (y % 32 == 0))                    {                        framebuffer[index] = 0x400000; // Vermelho mais escuro para grade                    }                    else                    {                        framebuffer[index] = plane_b_color;                    }                }            }        }    }    // Plano A (meio)    for (int y = 80; y < 200 && y < height - 80; y++)    {        for (int x = 80; x < 240 && x < width - 80; x++)        {            // Verificar limites do framebuffer (redundante, mas por segurança)            if (y >= 0 && y < height && x >= 0 && x < width)            {                // Calcular índice com verificação                const int index = y * width + x;                if (index >= 0 && index < width * height)                {                    // Desenhar um padrão no plano A                    if (((x + y) % 16) < 8)                    {                        framebuffer[index] = plane_a_color;                    }                }            }        }    }    // Sprites (topo)    // Desenhar um sprite animado (quadrado que se move)    static int sprite_x = 0;    static int sprite_dir = 1;    // Animar o movimento com limites seguros    sprite_x += sprite_dir * 2;    if (sprite_x > width - 50 || sprite_x < 0)    {        sprite_dir *= -1;        sprite_x += sprite_dir * 2;    }    // Garantir que o sprite está nos limites    sprite_x = (sprite_x < 0) ? 0 : sprite_x;    sprite_x = (sprite_x > width - 32) ? width - 32 : sprite_x;    // Desenhar o sprite com verificações de limites    for (int y = 100; y < 132 && y < height; y++)    {        for (int x = sprite_x; x < sprite_x + 32 && x < width; x++)        {            if (x >= 0 && x < width && y >= 0 && y < height)            {                // Calcular índice com verificação                const int index = y * width + x;                if (index >= 0 && index < width * height)                {                    framebuffer[index] = sprite_color;                }            }        }    }    // Desenhar um texto "MEGA EMU" no centro (simplificado - apenas retângulos)    const int text_y = 20;    const int char_width = 16;    const int char_height = 24;    const int text_x = (width - 8 * char_width) / 2;    // Tinta branca para texto    const uint32_t text_color = 0xFFFFFF;    // Caracteres "MEGA EMU" básicos usando retângulos com verificações de limites    for (int c = 0; c < 8; c++)    {        int cx = text_x + c * char_width;        switch (c)        {        case 0: // M            for (int y = 0; y < char_height && text_y + y < height; y++)            {                for (int x = 0; x < char_width && cx + x < width; x++)                {                    if (x == 0 || x == char_width - 1 || (y < char_height / 2 && (x == char_width / 2)))                    {                        int pos_y = text_y + y;                        int pos_x = cx + x;                        if (pos_x >= 0 && pos_x < width && pos_y >= 0 && pos_y < height)                        {                            // Calcular índice com verificação                            const int index = pos_y * width + pos_x;                            if (index >= 0 && index < width * height)                            {                                framebuffer[index] = text_color;                            }                        }                    }                }            }            break;        case 1: // E        case 2: // G        case 3: // A        case 4: // Espaço        case 5: // E        case 6: // M        case 7: // U            // Implementação simplificada para caracteres restantes            for (int y = 0; y < char_height && text_y + y < height; y++)            {                for (int x = 0; x < char_width && cx + x < width; x++)                {                    // Desenhar apenas o contorno dos caracteres para simplicidade                    if (x == 0 || x == char_width - 1 || y == 0 || y == char_height - 1)                    {                        int pos_y = text_y + y;                        int pos_x = cx + x;                        if (pos_x >= 0 && pos_x < width && pos_y >= 0 && pos_y < height)                        {                            // Calcular índice com verificação                            const int index = pos_y * width + pos_x;                            if (index >= 0 && index < width * height)                            {                                framebuffer[index] = text_color;                            }                        }                    }                }            }            break;        }    }    LOG_DEBUG("Frame VDP renderizado com sucesso");}/** * @brief Lê um registrador do VDP */uint8_t md_vdp_read_register(uint16_t reg){    if (reg < VDP_REG_COUNT)    {        return g_vdp.registers[reg];    }    return 0;}/** * @brief Escreve em um registrador do VDP */void md_vdp_write_register(uint16_t reg, uint8_t value){    if (reg < VDP_REG_COUNT)    {        g_vdp.registers[reg] = value;    }}/** * @brief Lê dados da porta de dados do VDP */uint16_t md_vdp_read_data(void){    // Implementação básica para compilação    return 0;}/** * @brief Escreve dados na porta de dados do VDP */void md_vdp_write_data(uint16_t value){    // Implementação básica para compilação}/** * @brief Lê dados da porta de controle do VDP */uint16_t md_vdp_read_control(void){    // Implementação básica para compilação    uint16_t status = 0;    // Status de VBLANK    if (g_vdp.vint_pending)    {        status |= 0x80;    }    // Status de HBLANK    if (g_vdp.hint_pending)    {        status |= 0x40;    }    // Frame completo    if (g_vdp.frame_complete)    {        status |= 0x08;        g_vdp.frame_complete = 0;    }    return status;}/** * @brief Escreve dados na porta de controle do VDP */void md_vdp_write_control(uint16_t value){    // Implementação básica para compilação}/** * @brief Verifica se o frame está completo */int md_vdp_is_frame_complete(void){    return g_vdp.frame_complete;}/** * @brief Obtém o contador de linha atual */uint16_t md_vdp_get_line_counter(void){    return g_vdp.v_counter;}/** * @brief Define o callback de interrupção */void md_vdp_set_interrupt_callback(void (*callback)(int type, void *userdata), void *userdata){    g_vdp.interrupt_callback = callback;    g_vdp.interrupt_userdata = userdata;}/** * @brief Inicia uma operação DMA */int md_vdp_start_dma(md_vdp_dma_type_t type, uint32_t source, uint16_t dest, uint16_t length){    // Implementação básica para compilação    return 0;}/** * @brief Desliga o VDP e libera recursos */void md_vdp_shutdown(void){    // Implementação básica para compilação    g_vdp.is_initialized = 0;}/** * @brief Define o efeito de scanline * @param opacity Opacidade do efeito (0-100) */void md_vdp_set_scanline_effect(int opacity){    // Limite a opacidade entre 0 e 100%    if (opacity < 0)        opacity = 0;    if (opacity > 100)        opacity = 100;    // Aplicar a opacidade ao campo apropriado    g_vdp.advanced_effects.scanline_enabled = (opacity > 0) ? 1 : 0;    g_vdp.advanced_effects.scanline_opacity = opacity;    // Atualizar flags de debug    g_vdp.debug_flags &= ~VDP_DEBUG_SCANLINES_MASK;    g_vdp.debug_flags |= (opacity << 8) & VDP_DEBUG_SCANLINES_MASK;}/** * @brief Define o nível de log do VDP * @param level Nível de log (0=info, 1=warning, 2=error) */void md_vdp_set_log_level(int level){    g_vdp_log_level = level;}/** * @brief Salva o conteúdo da VRAM em um arquivo * @param filename Nome do arquivo para salvar * @return 1 em caso de sucesso, 0 em caso de falha */int md_vdp_dump_vram_to_file(const char *filename){    FILE *file = fopen(filename, "wb");    if (file)    {        fwrite(g_vdp.vram, 1, sizeof(g_vdp.vram), file);        fclose(file);        return 1;    }    return 0;}/** * @brief Captura a tela atual e salva em um arquivo BMP * @param filename Nome do arquivo para salvar * @param framebuffer Buffer contendo a imagem * @param width Largura da imagem * @param height Altura da imagem * @return 1 em caso de sucesso, 0 em caso de falha */int md_vdp_capture_screen(const char *filename, uint32_t *framebuffer, int width, int height){    // Implementação básica - apenas um stub para compilação    printf("Captura de tela salva em: %s\n", filename);    return 1;}/** * @brief Salva os tiles da VRAM em um arquivo * @param filename Nome do arquivo para salvar * @param start_tile Índice do primeiro tile * @param num_tiles Número de tiles * @param palette Índice da paleta * @return 1 em caso de sucesso, 0 em caso de falha */int md_vdp_dump_tiles(const char *filename, int start_tile, int num_tiles, int palette){    // Implementação básica - apenas um stub para compilação    printf("Tiles salvos em: %s\n", filename);    return 1;}/** * @brief Carrega e analisa uma ROM para fins de depuração * * Analisa os cabeçalhos e informações da ROM mas NÃO armazena o ponteiro original */int md_vdp_debug_load_rom(const uint8_t *rom_data, size_t rom_size){    // Validar parâmetros    if (!rom_data || rom_size == 0)    {        printf("VDP Debug: ROM inválida (nula ou tamanho zero)\n");        return 0;    }    // Verificar tamanho mínimo (cabeçalho)    if (rom_size < 0x200)    {        printf("VDP Debug: ROM muito pequena para ser válida (menor que 512 bytes)\n");        return 0;    }    // Verificar se é uma ROM do Mega Drive (cabeçalho SEGA)    char header_sega[5] = {0};    memcpy(header_sega, rom_data + 0x100, 4);    // Imprimir cabeçalho apenas para debug    printf("VDP Debug: ROM header: '%s'\n", header_sega);    // Verificar cabeçalho SEGA    if (strncmp(header_sega, "SEGA", 4) != 0)    {        printf("VDP Debug: Cabeçalho SEGA não encontrado\n");        return 0;    }    // Nome da ROM (Offset 0x120, 48 bytes)    char rom_name[49] = {0};    memcpy(rom_name, rom_data + 0x120, 48);    printf("VDP Debug: ROM Nome: '%s'\n", rom_name);    // Região da ROM (Offset 0x1F0)    char region_code = rom_data[0x1F0];    printf("VDP Debug: ROM Região: '%c'\n", region_code);    // Lista de regiões suportadas    printf("VDP Debug: Regiões suportadas: ");    for (size_t i = 0; i < 3; i++)    {        char region = rom_data[0x1F0 + i];        if (region == 0 || region == ' ')            break;        printf("%c ", region);    }    printf("\n");    // Número de série e versão    char serial[15] = {0};    memcpy(serial, rom_data + 0x180, 14);    printf("VDP Debug: ROM Serial: '%s'\n", serial);    // RAM interna    uint16_t ram_start = (rom_data[0x1F0 + 8] << 8) | rom_data[0x1F0 + 9];    uint16_t ram_end = (rom_data[0x1F0 + 10] << 8) | rom_data[0x1F0 + 11];    printf("VDP Debug: RAM Interna: 0x%04X - 0x%04X\n", ram_start, ram_end);    // Sucesso - retornar 1    return 1;}/** * @brief Define o modo PAL ou NTSC * @param is_pal 1 para PAL, 0 para NTSC */void md_vdp_set_pal_mode(int is_pal){    g_vdp.is_pal = is_pal;    if (is_pal)    {        g_vdp.screen_height = 240;        g_vdp.frame_cycles = 53693175; // Ciclos para PAL    }    else    {        g_vdp.screen_height = 224;        g_vdp.frame_cycles = 53693175 * 6 / 7; // Ciclos para NTSC (aproximado)    }}// ✅ Corrigido (segue interface)void md_vdp_render_line(uint8_t line){ // Nome específico da plataforma    // Implementação atualizada    // ...}
+/**
+ * @file vdp.c
+ * @brief Implementação do VDP do Mega Drive
+ */
+
+#include "vdp.h"
+#include "vdp_dma.h"
+#include "vdp_scroll.h"
+#include "vdp_sprites.h"
+#include <string.h>
+
+// Estado do VDP
+static struct {
+  // Memórias
+  uint8_t vram[VDP_VRAM_SIZE];        // VRAM
+  uint16_t cram[VDP_CRAM_SIZE / 2];   // CRAM (cores)
+  uint16_t vsram[VDP_VSRAM_SIZE / 2]; // VSRAM (scroll vertical)
+
+  // Registradores
+  uint8_t registers[24]; // Registradores de controle
+  uint16_t status;       // Registrador de status
+
+  // Estado de acesso
+  vdp_access_mode_t access_mode; // Modo de acesso atual
+  uint32_t access_addr;          // Endereço de acesso
+  uint8_t first_write;           // Flag de primeiro write no controle
+  uint16_t command_word;         // Primeira palavra do comando
+  uint8_t auto_increment;        // Valor de auto-incremento
+
+  // Padrões de tiles
+  vdp_pattern_t patterns[2048]; // 2048 padrões de 8x8
+
+  // Buffer de frame
+  uint8_t frame_buffer[320 * 240 * 4]; // RGBA
+
+  // Contadores
+  uint16_t v_counter; // Contador vertical (0-261 NTSC, 0-312 PAL)
+  uint16_t h_counter; // Contador horizontal (0-341)
+  uint8_t in_vblank;  // Flag de V-blank
+  uint8_t in_hblank;  // Flag de H-blank
+
+  // Interrupções
+  uint8_t hint_counter; // Contador de interrupção H
+  uint8_t hint_value;   // Valor para interrupção H
+  uint8_t hint_enabled; // Flag de habilitação de interrupção H
+  uint8_t vint_enabled; // Flag de habilitação de interrupção V
+  uint8_t ext_enabled;  // Flag de habilitação de interrupção externa
+
+  // Modo de vídeo
+  uint8_t mode_5;    // Flag de modo 5 (320x224)
+  uint8_t interlace; // Modo entrelaçado
+  uint8_t pal_mode;  // Flag de modo PAL
+
+} g_vdp_state;
+
+// Constantes de temporização
+#define NTSC_LINES 262
+#define PAL_LINES 313
+#define ACTIVE_LINES 224
+#define H_PIXELS 320
+#define H_TOTAL 342
+
+// Funções auxiliares internas
+static void process_control_port(uint16_t value) {
+  if (!g_vdp_state.first_write) {
+    // Primeira palavra do comando
+    g_vdp_state.command_word = value;
+    g_vdp_state.first_write = 1;
+  } else {
+    // Segunda palavra - processa comando
+    uint32_t addr = ((value & 0x3) << 14) | g_vdp_state.command_word;
+    uint8_t code = (value >> 14) & 0x3;
+
+    switch (code) {
+    case 0: // VRAM read
+      g_vdp_state.access_mode = VDP_ACCESS_VRAM_READ;
+      g_vdp_state.access_addr = addr & 0xFFFF;
+      break;
+
+    case 1: // VRAM write
+      g_vdp_state.access_mode = VDP_ACCESS_VRAM_WRITE;
+      g_vdp_state.access_addr = addr & 0xFFFF;
+      break;
+
+    case 2: // Register write
+      vdp_write_register(value & 0x1F, g_vdp_state.command_word & 0xFF);
+      break;
+
+    case 3: // CRAM/VSRAM write
+      if (value & 0x80) {
+        g_vdp_state.access_mode = VDP_ACCESS_VSRAM_WRITE;
+        g_vdp_state.access_addr = addr & 0x3F;
+      } else {
+        g_vdp_state.access_mode = VDP_ACCESS_CRAM_WRITE;
+        g_vdp_state.access_addr = addr & 0x7F;
+      }
+      break;
+    }
+
+    g_vdp_state.first_write = 0;
+  }
+}
+
+static void increment_addr(void) {
+  g_vdp_state.access_addr =
+      (g_vdp_state.access_addr + g_vdp_state.auto_increment) & 0xFFFF;
+}
+
+// Funções de acesso à memória
+uint16_t vdp_read_vram(uint32_t addr) {
+  addr &= 0xFFFF;
+  return (g_vdp_state.vram[addr] << 8) | g_vdp_state.vram[addr ^ 1];
+}
+
+void vdp_write_vram(uint32_t addr, uint16_t data) {
+  addr &= 0xFFFF;
+  g_vdp_state.vram[addr] = data >> 8;
+  g_vdp_state.vram[addr ^ 1] = data & 0xFF;
+}
+
+uint16_t vdp_read_cram(uint16_t addr) {
+  addr &= 0x7F;
+  return g_vdp_state.cram[addr / 2];
+}
+
+void vdp_write_cram(uint16_t addr, uint16_t data) {
+  addr &= 0x7F;
+  g_vdp_state.cram[addr / 2] = data & 0xEEE;
+}
+
+uint16_t vdp_read_vsram(uint16_t addr) {
+  addr &= 0x3F;
+  return g_vdp_state.vsram[addr / 2];
+}
+
+void vdp_write_vsram(uint16_t addr, uint16_t data) {
+  addr &= 0x3F;
+  g_vdp_state.vsram[addr / 2] = data & 0x03FF;
+}
+
+// Funções de acesso a padrões
+uint8_t *vdp_get_pattern_data(uint16_t pattern_index) {
+  pattern_index &= 0x7FF;
+  return g_vdp_state.patterns[pattern_index].data;
+}
+
+void vdp_write_pattern_data(uint16_t pattern_index, const uint8_t *data) {
+  pattern_index &= 0x7FF;
+  memcpy(g_vdp_state.patterns[pattern_index].data, data, 32);
+}
+
+// Funções de renderização
+void vdp_write_line_buffer(uint16_t line, const uint8_t *buffer) {
+  if (line < 240) {
+    memcpy(&g_vdp_state.frame_buffer[line * 320 * 4], buffer, 320 * 4);
+  }
+}
+
+void vdp_render_pattern(uint16_t pattern_index, int16_t x, int16_t y,
+                        uint8_t palette, uint8_t priority, uint8_t flip_h,
+                        uint8_t flip_v) {
+  if (x < 0 || x >= 320 || y < 0 || y >= 240) {
+    return;
+  }
+
+  pattern_index &= 0x7FF;
+  const uint8_t *pattern = g_vdp_state.patterns[pattern_index].data;
+  uint8_t *dest = &g_vdp_state.frame_buffer[(y * 320 + x) * 4];
+
+  for (int py = 0; py < 8; py++) {
+    int src_y = flip_v ? 7 - py : py;
+    if (y + py >= 240)
+      break;
+
+    const uint8_t *src_line = &pattern[src_y * 4];
+    uint8_t *dst_line = &dest[py * 320 * 4];
+
+    for (int px = 0; px < 8; px++) {
+      if (x + px >= 320)
+        break;
+
+      int src_x = flip_h ? 7 - px : px;
+      uint8_t pixel = (src_line[src_x / 2] >> ((1 - (src_x & 1)) * 4)) & 0x0F;
+
+      if (pixel) {
+        dst_line[px * 4 + 0] = pixel;
+        dst_line[px * 4 + 1] = palette;
+        dst_line[px * 4 + 2] = priority;
+        dst_line[px * 4 + 3] = 1;
+      }
+    }
+  }
+}
+
+// Funções de controle
+void vdp_init(void) {
+  memset(&g_vdp_state, 0, sizeof(g_vdp_state));
+  g_vdp_state.status = 0x3400; // V-blank, FIFO empty
+
+  // Configura modo padrão
+  g_vdp_state.mode_5 = 1;
+  g_vdp_state.pal_mode = 0; // NTSC por padrão
+
+  // Inicializa sistemas relacionados
+  emu_vdp_scroll_init();
+  emu_vdp_sprites_init();
+  emu_vdp_dma_init();
+}
+
+void vdp_reset(void) {
+  memset(g_vdp_state.registers, 0, sizeof(g_vdp_state.registers));
+  g_vdp_state.first_write = 0;
+  g_vdp_state.auto_increment = 1;
+  g_vdp_state.status = 0x3400;
+
+  // Reseta contadores
+  g_vdp_state.v_counter = 0;
+  g_vdp_state.h_counter = 0;
+  g_vdp_state.in_vblank = 1;
+  g_vdp_state.in_hblank = 0;
+
+  // Reseta interrupções
+  g_vdp_state.hint_counter = 0;
+  g_vdp_state.hint_value = 0;
+  g_vdp_state.hint_enabled = 0;
+  g_vdp_state.vint_enabled = 0;
+  g_vdp_state.ext_enabled = 0;
+
+  // Reseta sistemas relacionados
+  emu_vdp_scroll_reset();
+  emu_vdp_sprites_reset();
+  emu_vdp_dma_reset();
+}
+
+void vdp_write_register(uint8_t reg, uint8_t value) {
+  if (reg < 24) {
+    g_vdp_state.registers[reg] = value;
+
+    // Processa registradores especiais
+    switch (reg) {
+    case VDP_REG_MODE1:
+      g_vdp_state.hint_enabled = (value & 0x10) != 0;
+      break;
+
+    case VDP_REG_MODE2:
+      g_vdp_state.vint_enabled = (value & 0x20) != 0;
+      g_vdp_state.mode_5 = (value & 0x04) != 0;
+      break;
+
+    case VDP_REG_HINT:
+      g_vdp_state.hint_value = value;
+      break;
+
+    case VDP_REG_MODE4:
+      g_vdp_state.interlace = (value & 0x06) >> 1;
+      break;
+
+    case VDP_REG_AUTO_INC:
+      g_vdp_state.auto_increment = value;
+      break;
+    }
+  }
+}
+
+uint8_t vdp_read_register(uint8_t reg) {
+  return (reg < 24) ? g_vdp_state.registers[reg] : 0;
+}
+
+void vdp_write_control(uint16_t value) { process_control_port(value); }
+
+uint16_t vdp_read_status(void) {
+  uint16_t status = g_vdp_state.status;
+  g_vdp_state.status &= ~0x0200; // Clear sprite collision flag
+  return status;
+}
+
+void vdp_write_data(uint16_t value) {
+  switch (g_vdp_state.access_mode) {
+  case VDP_ACCESS_VRAM_WRITE:
+    vdp_write_vram(g_vdp_state.access_addr, value);
+    break;
+
+  case VDP_ACCESS_CRAM_WRITE:
+    vdp_write_cram(g_vdp_state.access_addr, value);
+    break;
+
+  case VDP_ACCESS_VSRAM_WRITE:
+    vdp_write_vsram(g_vdp_state.access_addr, value);
+    break;
+  }
+
+  increment_addr();
+}
+
+uint16_t vdp_read_data(void) {
+  uint16_t value = 0;
+
+  switch (g_vdp_state.access_mode) {
+  case VDP_ACCESS_VRAM_READ:
+    value = vdp_read_vram(g_vdp_state.access_addr);
+    break;
+
+  case VDP_ACCESS_CRAM_READ:
+    value = vdp_read_cram(g_vdp_state.access_addr);
+    break;
+
+  case VDP_ACCESS_VSRAM_READ:
+    value = vdp_read_vsram(g_vdp_state.access_addr);
+    break;
+  }
+
+  increment_addr();
+  return value;
+}
+
+// Funções de processamento
+static void update_h_interrupt(void) {
+  if (g_vdp_state.hint_enabled) {
+    if (g_vdp_state.hint_counter == 0) {
+      // Gera interrupção H
+      g_vdp_state.status |= 0x0004;
+      g_vdp_state.hint_counter = g_vdp_state.hint_value;
+    } else {
+      g_vdp_state.hint_counter--;
+    }
+  }
+}
+
+static void update_v_interrupt(void) {
+  if (g_vdp_state.vint_enabled) {
+    // Gera interrupção V
+    g_vdp_state.status |= 0x0008;
+  }
+}
+
+void vdp_run_scanline(void) {
+  // Atualiza contador vertical
+  uint16_t max_lines = g_vdp_state.pal_mode ? PAL_LINES : NTSC_LINES;
+
+  // Processa linha ativa
+  if (g_vdp_state.v_counter < ACTIVE_LINES) {
+    // Renderiza linha
+    emu_vdp_render_line(g_vdp_state.v_counter);
+
+    // Processa DMA se necessário
+    emu_vdp_dma_run();
+
+    // Atualiza interrupção H
+    update_h_interrupt();
+  }
+  // Processa V-blank
+  else if (g_vdp_state.v_counter == ACTIVE_LINES) {
+    g_vdp_state.in_vblank = 1;
+    g_vdp_state.status |= 0x0008; // Set V-blank flag
+    update_v_interrupt();
+  }
+
+  // Atualiza contador vertical
+  g_vdp_state.v_counter++;
+  if (g_vdp_state.v_counter >= max_lines) {
+    g_vdp_state.v_counter = 0;
+    g_vdp_state.in_vblank = 0;
+    g_vdp_state.status &= ~0x0008; // Clear V-blank flag
+  }
+
+  // Atualiza contador horizontal
+  g_vdp_state.h_counter = (g_vdp_state.h_counter + 1) % H_TOTAL;
+
+  // Atualiza H-blank
+  if (g_vdp_state.h_counter == H_PIXELS) {
+    g_vdp_state.in_hblank = 1;
+    g_vdp_state.status |= 0x0004; // Set H-blank flag
+  } else if (g_vdp_state.h_counter == 0) {
+    g_vdp_state.in_hblank = 0;
+    g_vdp_state.status &= ~0x0004; // Clear H-blank flag
+  }
+}
+
+void vdp_end_frame(void) {
+  // Processa sprites para o próximo frame
+  emu_vdp_sprites_end_frame();
+
+  // Limpa flags de interrupção
+  g_vdp_state.status &= ~0x000C; // Clear H-int and V-int flags
+
+  // Reseta contadores
+  g_vdp_state.hint_counter = g_vdp_state.hint_value;
+
+  // Atualiza modo de vídeo se necessário
+  if (g_vdp_state.registers[VDP_REG_MODE2] & 0x04) {
+    g_vdp_state.mode_5 = 1;
+  }
+}
+
+// Funções de consulta de estado
+uint8_t vdp_in_vblank(void) { return g_vdp_state.in_vblank; }
+
+uint8_t vdp_in_hblank(void) { return g_vdp_state.in_hblank; }
+
+uint16_t vdp_get_line(void) { return g_vdp_state.v_counter; }
+
+uint8_t vdp_get_mode(void) {
+  uint8_t mode = 0;
+
+  // Verifica bits de modo nos registradores
+  if (g_vdp_state.registers[VDP_REG_MODE1] & 0x04)
+    mode |= 0x01; // H40
+  if (g_vdp_state.registers[VDP_REG_MODE2] & 0x04)
+    mode |= 0x02; // Mode 5
+  if (g_vdp_state.registers[VDP_REG_MODE4] & 0x01)
+    mode |= 0x04; // H80
+  if (g_vdp_state.registers[VDP_REG_MODE4] & 0x06)
+    mode |= 0x08; // Interlace
+  if (g_vdp_state.registers[VDP_REG_MODE4] & 0x08)
+    mode |= 0x10; // Shadow/Highlight
+
+  return mode;
+}
+
+uint8_t vdp_is_pal(void) { return g_vdp_state.pal_mode; }
+
+uint8_t vdp_is_mode5(void) { return g_vdp_state.mode_5; }
+
+uint8_t vdp_get_interlace(void) { return g_vdp_state.interlace; }

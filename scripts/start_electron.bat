@@ -1,0 +1,3 @@
+@echo off
+echo Iniciando o Electron com React para o Mega Emu...
+node "%~dp0start_electron.js"

@@ -1,108 +1,159 @@
 /**
  * @file sms_io.h
- * @brief Definições para o sistema de entrada e controles do Master System
+ * @brief Interface para o sistema de I/O do Master System
  */
 
 #ifndef SMS_IO_H
 #define SMS_IO_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "../../../core/save_state.h"
+#include "../peripherals/sms_peripherals.h"
+
+// Endereços de portas do Master System
+#define SMS_IO_PORT_JOYSTICK1       0xDC    // Leitura do controle 1
+#define SMS_IO_PORT_JOYSTICK2       0xDD    // Leitura do controle 2
+#define SMS_IO_PORT_EXP             0xDE    // Porta de expansão
+#define SMS_IO_PORT_REGION          0x3F    // Leitura de região e controle 1
+#define SMS_IO_PORT_VDPCTRL         0xBF    // Porta de controle do VDP
+#define SMS_IO_PORT_VDPDATA         0xBE    // Porta de dados do VDP
+#define SMS_IO_PORT_HCOUNTER        0x7F    // Contador horizontal do VDP
+#define SMS_IO_PORT_VCOUNTER        0x7E    // Contador vertical do VDP
+#define SMS_IO_PORT_PSGDATA         0x7F    // Porta de dados do PSG
+#define SMS_IO_PORT_MEMCTRL         0x3E    // Controle de memória
+#define SMS_IO_PORT_IOCTRL          0x3F    // Controle de I/O
 
 /**
- * @brief Definições dos botões do Master System
+ * @brief Estrutura do sistema de I/O do Master System
  */
-#define SMS_BUTTON_UP     0x01
-#define SMS_BUTTON_DOWN   0x02
-#define SMS_BUTTON_LEFT   0x04
-#define SMS_BUTTON_RIGHT  0x08
-#define SMS_BUTTON_1      0x10
-#define SMS_BUTTON_2      0x20
-#define SMS_BUTTON_START  0x40  // Botão START (Game Gear) ou PAUSE (Master System)
+typedef struct {
+    sms_peripherals_t* peripherals;     // Periféricos conectados
+    uint8_t io_control;                 // Registro de controle de I/O
+    uint8_t memory_control;             // Registro de controle de memória
+    bool region_is_japan;               // Flag de região: true = Japão, false = Exportação
+    uint8_t th_line_status[2];          // Estado da linha TH para cada porta (0 = porta 1, 1 = porta 2)
+} sms_io_t;
 
 /**
- * @brief Opaque handle para o sistema de entrada
+ * @brief Inicializa o sistema de I/O do Master System
+ *
+ * @param is_japan Flag indicando se o sistema é versão japonesa
+ * @return Ponteiro para a estrutura de I/O ou NULL em caso de erro
  */
-typedef struct sms_input_t sms_input_t;
+sms_io_t* sms_io_init(bool is_japan);
 
 /**
- * @brief Cria uma nova instância do sistema de entrada
- * 
- * @return Ponteiro para a instância ou NULL em caso de erro
+ * @brief Libera os recursos do sistema de I/O
+ *
+ * @param io Ponteiro para a estrutura de I/O
  */
-sms_input_t* sms_input_create(void);
+void sms_io_free(sms_io_t* io);
 
 /**
- * @brief Destrói uma instância do sistema de entrada e libera recursos
- * 
- * @param input Ponteiro para a instância
+ * @brief Reseta o sistema de I/O para o estado inicial
+ *
+ * @param io Ponteiro para a estrutura de I/O
  */
-void sms_input_destroy(sms_input_t *input);
+void sms_io_reset(sms_io_t* io);
 
 /**
- * @brief Reseta o sistema de entrada para o estado inicial
- * 
- * @param input Ponteiro para a instância
- */
-void sms_input_reset(sms_input_t *input);
-
-/**
- * @brief Define o estado dos botões do controlador 1
- * 
- * @param input Ponteiro para a instância
- * @param button_state Estado dos botões (bitmap)
- */
-void sms_input_set_controller1(sms_input_t *input, uint8_t button_state);
-
-/**
- * @brief Define o estado dos botões do controlador 2
- * 
- * @param input Ponteiro para a instância
- * @param button_state Estado dos botões (bitmap)
- */
-void sms_input_set_controller2(sms_input_t *input, uint8_t button_state);
-
-/**
- * @brief Lê o estado atual do controlador 1
- * 
- * @param input Ponteiro para a instância
- * @return Estado dos botões (bitmap)
- */
-uint8_t sms_input_read_controller1(sms_input_t *input);
-
-/**
- * @brief Lê o estado atual do controlador 2
- * 
- * @param input Ponteiro para a instância
- * @return Estado dos botões (bitmap)
- */
-uint8_t sms_input_read_controller2(sms_input_t *input);
-
-/**
- * @brief Lê o estado atual das portas de I/O
- * 
- * @param input Ponteiro para a instância
- * @param port Número da porta
- * @return Valor lido
- */
-uint8_t sms_input_read_port(sms_input_t *input, uint8_t port);
-
-/**
- * @brief Escreve um valor nas portas de I/O
- * 
- * @param input Ponteiro para a instância
- * @param port Número da porta
+ * @brief Escreve um byte em uma porta de I/O
+ *
+ * @param io Ponteiro para a estrutura de I/O
+ * @param port Endereço da porta
  * @param value Valor a ser escrito
  */
-void sms_input_write_port(sms_input_t *input, uint8_t port, uint8_t value);
+void sms_io_write_port(sms_io_t* io, uint8_t port, uint8_t value);
 
 /**
- * @brief Registra o sistema de entrada no sistema de save state
- * 
- * @param input Ponteiro para a instância
+ * @brief Lê um byte de uma porta de I/O
+ *
+ * @param io Ponteiro para a estrutura de I/O
+ * @param port Endereço da porta
+ * @return Valor lido da porta
+ */
+uint8_t sms_io_read_port(sms_io_t* io, uint8_t port);
+
+/**
+ * @brief Processa a detecção de alvos do Light Phaser para a linha atual do VDP
+ *
+ * @param io Ponteiro para a estrutura de I/O
+ * @param frame_buffer Buffer de frame atual do VDP
+ * @param vdp_line Linha atual do VDP
+ * @param h_counter Contador horizontal do VDP
+ */
+void sms_io_process_lightphaser(sms_io_t* io, const uint32_t* frame_buffer,
+                              uint8_t vdp_line, uint8_t h_counter);
+
+/**
+ * @brief Atualiza o estado do controle padrão
+ *
+ * @param io Ponteiro para a estrutura de I/O
+ * @param port Número da porta (0 = porta 1, 1 = porta 2)
+ * @param up Estado do botão Up
+ * @param down Estado do botão Down
+ * @param left Estado do botão Left
+ * @param right Estado do botão Right
+ * @param button1 Estado do botão 1
+ * @param button2 Estado do botão 2
+ */
+void sms_io_update_controller(sms_io_t* io, uint8_t port,
+                           bool up, bool down, bool left, bool right,
+                           bool button1, bool button2);
+
+/**
+ * @brief Atualiza o estado do Light Phaser
+ *
+ * @param io Ponteiro para a estrutura de I/O
+ * @param x Posição X do cursor (0-255)
+ * @param y Posição Y do cursor (0-191)
+ * @param trigger Estado do gatilho (true = pressionado)
+ */
+void sms_io_update_lightphaser(sms_io_t* io, uint16_t x, uint16_t y, bool trigger);
+
+/**
+ * @brief Atualiza o estado do Paddle
+ *
+ * @param io Ponteiro para a estrutura de I/O
+ * @param position Posição do Paddle (0-255)
+ * @param button1 Estado do botão 1 (true = pressionado)
+ * @param button2 Estado do botão 2 (true = pressionado)
+ */
+void sms_io_update_paddle(sms_io_t* io, uint8_t position, bool button1, bool button2);
+
+/**
+ * @brief Registra o estado do sistema de I/O no save state
+ *
+ * @param io Ponteiro para a estrutura de I/O
  * @param state Ponteiro para o contexto de save state
  * @return Código de erro (0 para sucesso)
  */
-int sms_input_register_save_state(sms_input_t *input, save_state_t *state);
+int sms_io_register_save_state(sms_io_t* io, save_state_t* state);
 
-#endif /* SMS_IO_H */
+/**
+ * @brief Atualiza o sistema de I/O após carregar um save state
+ *
+ * @param io Ponteiro para a estrutura de I/O
+ */
+void sms_io_update_after_state_load(sms_io_t* io);
+
+/**
+ * @brief Conecta um periférico específico à porta indicada
+ *
+ * @param io Ponteiro para a estrutura de I/O
+ * @param port Número da porta (0 = porta 1, 1 = porta 2)
+ * @param type Tipo de periférico a ser conectado
+ * @return 0 em caso de sucesso, código de erro em caso de falha
+ */
+int sms_io_connect_peripheral(sms_io_t* io, uint8_t port, sms_peripheral_type_t type);
+
+/**
+ * @brief Desconecta o periférico da porta indicada
+ *
+ * @param io Ponteiro para a estrutura de I/O
+ * @param port Número da porta (0 = porta 1, 1 = porta 2)
+ */
+void sms_io_disconnect_peripheral(sms_io_t* io, uint8_t port);
+
+#endif // SMS_IO_H

@@ -3,106 +3,116 @@ name: CI/CD
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
-env:
-  BUILD_TYPE: Release
-
 jobs:
   build:
-    runs-on: windows-latest
+    name: Build e Testes
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        build_type: [Debug, Release]
 
     steps:
     - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
 
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1.1
-
-    - name: Setup vcpkg
+    - name: Configurar vcpkg
       uses: lukka/run-vcpkg@v10
       with:
-        vcpkgGitCommitId: 'master'
+        vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
 
-    - name: Install dependencies
+    - name: Instalar dependências (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
       run: |
-        vcpkg install sdl2:x64-windows
-        vcpkg install qt5-base:x64-windows
-        vcpkg install opengl:x64-windows
-        vcpkg install glew:x64-windows
-        vcpkg install zlib:x64-windows
-        vcpkg install libpng:x64-windows
-        vcpkg install libjpeg-turbo:x64-windows
-        vcpkg install freetype:x64-windows
+        sudo apt-get update
+        sudo apt-get install -y libsdl2-dev qt6-base-dev
 
-    - name: Configure CMake
+    - name: Instalar dependências (macOS)
+      if: matrix.os == 'macos-latest'
       run: |
-        cmake -B ${{github.workspace}}/build `
-          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} `
-          -DCMAKE_TOOLCHAIN_FILE=${{env.VCPKG_ROOT}}/scripts/buildsystems/vcpkg.cmake
+        brew install sdl2 qt@6
+
+    - name: Configurar CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
 
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+      run: cmake --build build --config ${{ matrix.build_type }}
 
-    - name: Test
-      working-directory: ${{github.workspace}}/build
-      run: ctest -C ${{env.BUILD_TYPE}} --output-on-failure
+    - name: Testes
+      working-directory: build
+      run: ctest -C ${{ matrix.build_type }} --output-on-failure
 
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
-      run: |
-        $version = $env:GITHUB_REF -replace 'refs/tags/v', ''
-        ./scripts/build/create_release.ps1 -Version $version -NoPrompt
-
-    - name: Upload Release Asset
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: actions/upload-artifact@v3
-      with:
-        name: mega-emu-${{ github.ref_name }}
-        path: build/released/mega-emu-*.zip
-
-  release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Download Release Asset
-      uses: actions/download-artifact@v3
-      with:
-        name: mega-emu-${{ github.ref_name }}
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: mega-emu-*.zip
-        draft: false
-        prerelease: contains(github.ref, '-')
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  docs:
-    needs: build
-    if: github.ref == 'refs/heads/main'
+  code-analysis:
+    name: Análise de Código
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install Doxygen
+    - name: Análise com Clang-Tidy
+      uses: ZedThree/clang-tidy-review@v0.14.0
+      with:
+        cmake_command: cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+    - name: Análise com Cppcheck
+      uses: cpp-linter/cpp-linter-action@v2
+      with:
+        style: file
+
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  documentation:
+    name: Documentação
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Instalar Doxygen
       run: sudo apt-get install -y doxygen graphviz
 
-    - name: Generate Documentation
-      run: |
-        ./scripts/build/generate_docs.ps1 -NoPrompt
+    - name: Gerar Documentação
+      run: doxygen Doxyfile
 
-    - name: Deploy to GitHub Pages
+    - name: Deploy para GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./docs/generated/html
-        force_orphan: true
+        publish_dir: ./docs/doxygen/html
+
+  release:
+    name: Release
+    needs: [build, code-analysis, documentation]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Criar Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Artifacts
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./build/mega_emu
+        asset_name: mega_emu
+        asset_content_type: application/octet-stream

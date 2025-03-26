@@ -1,36 +1,73 @@
-name: Documentation CI/CD
+name: Documentation
+
 on:
   push:
+    branches: [ main ]
     paths:
       - 'docs/**'
+      - '**.md'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - '**.md'
       - '.github/workflows/docs.yml'
 
 jobs:
-  validate:
+  markdown-link-check:
+    name: Check Markdown links
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-      
-      - name: Install dependencies
-        run: |
-          pip install mkdocs mkdocs-material pymdown-extensions
-          pip install pytest pytest-md
-      
-      - name: Run documentation tests
-        run: |
-          python tools/validate_docs.py
-          python -m pytest tests/docs/
-      
-      - name: Build documentation
-        run: mkdocs build
-      
-      - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
+    - uses: actions/checkout@v3
+    - uses: gaurav-nelson/github-action-markdown-link-check@v1
+      with:
+        use-quiet-mode: 'yes'
+        use-verbose-mode: 'yes'
+        config-file: '.github/workflows/mlc_config.json'
+        folder-path: 'docs'
+        file-path: './README.md, ./CONTRIBUTING.md, ./LICENSE'
+
+  markdown-lint:
+    name: Lint Markdown files
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: DavidAnson/markdownlint-cli2-action@v9
+      with:
+        globs: |
+          docs/**/*.md
+          *.md
+
+  spellcheck:
+    name: Check spelling
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: streetsidesoftware/cspell-action@v2
+      with:
+        files: |
+          docs/**/*.md
+          *.md
+        config: '.github/workflows/cspell.json'
+
+  build-docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Doxygen
+      run: sudo apt-get install -y doxygen graphviz
+
+    - name: Generate documentation
+      run: |
+        cd docs
+        doxygen Doxyfile
+
+    - name: Deploy to GitHub Pages
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs/html

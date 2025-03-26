@@ -1,0 +1,1 @@
+#include <stdint.h>#ifndef EMU_INPUT_CONFIG_STRUCT_H#define EMU_INPUT_CONFIG_STRUCT_H#ifdef __cplusplusextern "C" {#endif#include "input_config_types.h"struct emu_input_config_instance {    emu_key_mapping_t* mappings;    uint32_t num_mappings;    bool initialized;};#endif // EMU_INPUT_CONFIG_STRUCT_H

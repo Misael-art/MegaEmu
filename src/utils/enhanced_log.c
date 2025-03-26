@@ -1,1 +1,172 @@
-/** * @file enhanced_log.c * @brief Implementação do sistema de logging aprimorado */#include "enhanced_log.h"#include <stdio.h>#include <stdlib.h>#include <string.h>#include <time.h>/* Tamanho máximo da mensagem de log */#define MAX_LOG_MESSAGE 1024/* Estrutura de configuração */typedef struct{    FILE *file;    emu_log_level_t global_level;    emu_log_level_t module_levels[10]; /* Tamanho arbitrário maior que o número de módulos */    bool initialized;} log_config_t;/* Variáveis estáticas */static log_config_t g_config = {    .file = NULL,    .global_level = EMU_LOG_LEVEL_INFO,    .module_levels = {EMU_LOG_LEVEL_INFO},    .initialized = false};/* Strings dos níveis de log */static const char *g_level_strings[] = {    [EMU_LOG_LEVEL_ERROR] = "ERRO",    [EMU_LOG_LEVEL_WARNING] = "AVISO",    [EMU_LOG_LEVEL_INFO] = "INFO",    [EMU_LOG_LEVEL_DEBUG] = "DEBUG",    [EMU_LOG_LEVEL_TRACE] = "TRACE"};/* Função auxiliar para obter string do módulo */static const char *get_module_string(emu_log_module_t module){    switch (module)    {    case EMU_LOG_MODULE_CORE:        return "CORE";    case EMU_LOG_MODULE_CPU:        return "CPU";    case EMU_LOG_MODULE_MEMORY:        return "MEMORY";    case EMU_LOG_MODULE_VIDEO:        return "VIDEO";    case EMU_LOG_MODULE_AUDIO:        return "AUDIO";    case EMU_LOG_MODULE_INPUT:        return "INPUT";    case EMU_LOG_MODULE_SAVE:        return "SAVE";    case EMU_LOG_MODULE_PERF:        return "PERF";    default:        return "UNKNOWN";    }}/* Função auxiliar para obter nível do módulo */static emu_log_level_t get_module_level(emu_log_module_t module){    /* Converter ID do módulo para índice do array */    int index = 0;    switch (module)    {    case EMU_LOG_MODULE_CORE:        index = 0;        break;    case EMU_LOG_MODULE_CPU:        index = 1;        break;    case EMU_LOG_MODULE_MEMORY:        index = 2;        break;    case EMU_LOG_MODULE_VIDEO:        index = 3;        break;    case EMU_LOG_MODULE_AUDIO:        index = 4;        break;    case EMU_LOG_MODULE_INPUT:        index = 5;        break;    case EMU_LOG_MODULE_SAVE:        index = 6;        break;    case EMU_LOG_MODULE_PERF:        index = 7;        break;    default:        index = 0;        break;    }    return g_config.module_levels[index];}/* Função auxiliar para definir nível do módulo */static void set_module_level(emu_log_module_t module, emu_log_level_t level){    /* Converter ID do módulo para índice do array */    int index = 0;    switch (module)    {    case EMU_LOG_MODULE_CORE:        index = 0;        break;    case EMU_LOG_MODULE_CPU:        index = 1;        break;    case EMU_LOG_MODULE_MEMORY:        index = 2;        break;    case EMU_LOG_MODULE_VIDEO:        index = 3;        break;    case EMU_LOG_MODULE_AUDIO:        index = 4;        break;    case EMU_LOG_MODULE_INPUT:        index = 5;        break;    case EMU_LOG_MODULE_SAVE:        index = 6;        break;    case EMU_LOG_MODULE_PERF:        index = 7;        break;    default:        index = 0;        break;    }    g_config.module_levels[index] = level;}bool emu_log_init(const emu_log_config_t *config){    if (g_config.initialized)    {        fprintf(stderr, "ERRO: Sistema de log já inicializado\n");        return false;    }    if (!config)    {        fprintf(stderr, "ERRO: Configuração de log inválida\n");        return false;    }    // Inicializar níveis de log para todos os módulos    for (int i = 0; i < 10; i++)    {        g_config.module_levels[i] = config->level;    }    g_config.global_level = config->level;    g_config.file = config->output;    g_config.initialized = true;    fprintf(stderr, "INFO: Sistema de log inicializado com sucesso\n");    return true;}void emu_log_shutdown(void){    if (!g_config.initialized)    {        return;    }    if (g_config.file)    {        fclose(g_config.file);        g_config.file = NULL;    }    g_config.initialized = false;    EMU_LOG_INFO(EMU_LOG_CAT_CORE, "Sistema de log finalizado");}void emu_log_set_level(emu_log_level_t level){    if (!g_config.initialized || level >= EMU_LOG_LEVEL_MAX)    {        return;    }    g_config.global_level = level;}void emu_log_set_module_level(emu_log_module_t module, emu_log_level_t level){    if (!g_config.initialized || level >= EMU_LOG_LEVEL_MAX)    {        return;    }    set_module_level(module, level);}void emu_log_set_file(const char *filename){    if (!g_config.initialized || !filename)    {        return;    }    if (g_config.file)    {        fclose(g_config.file);    }    g_config.file = fopen(filename, "a");    if (!g_config.file)    {        EMU_LOG_ERROR(EMU_LOG_CAT_CORE, "Falha ao abrir arquivo de log: %s", filename);    }}void emu_log_message(emu_log_level_t level, emu_log_category_t category, const char *file, int line, const char *fmt, ...){    if (!g_config.initialized || level >= EMU_LOG_LEVEL_MAX)    {        return;    }    /* Obter nível do módulo de forma segura */    emu_log_level_t module_level = get_module_level((emu_log_module_t)category);    if (level > g_config.global_level || level > module_level)    {        return;    }    char message[MAX_LOG_MESSAGE];    va_list args;    va_start(args, fmt);    vsnprintf(message, sizeof(message), fmt, args);    va_end(args);    time_t now = time(NULL);    struct tm *timeinfo = localtime(&now);    char timestamp[32];    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", timeinfo);    /* Formatar mensagem de log */    char log_message[MAX_LOG_MESSAGE];    snprintf(log_message, sizeof(log_message), "[%s] [%s] [%s:%d] %s\n",             timestamp,             g_level_strings[level],             file,             line,             message);    /* Escrever no arquivo de log */    if (g_config.file)    {        fprintf(g_config.file, "%s", log_message);        fflush(g_config.file);    }    /* Escrever no stderr se não for o mesmo arquivo */    if (g_config.file != stderr)    {        fprintf(stderr, "%s", log_message);    }}/* Função para verificar se um nível de log está habilitado */bool emu_enhanced_log_is_enabled(emu_log_level_t level){    if (!g_config.initialized)        return false;    return level <= g_config.global_level;}
+/**
+ * @file enhanced_log.c
+ * @brief Implementação do sistema de log aprimorado
+ */
+
+#include "enhanced_log.h"
+#include "log_categories.h"
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+// Strings para os níveis de log
+static const char *level_strings[] = {"ERROR", "WARN", "INFO", "DEBUG",
+                                      "TRACE"};
+
+// Cores ANSI para console
+static const char *level_colors[] = {
+    "\x1b[31m", // ERROR - Vermelho
+    "\x1b[33m", // WARN - Amarelo
+    "\x1b[32m", // INFO - Verde
+    "\x1b[36m", // DEBUG - Ciano
+    "\x1b[35m"  // TRACE - Magenta
+};
+
+// Estado do sistema de log
+static struct {
+  FILE *file;                               // Arquivo de log
+  emu_log_level_t level;                    // Nível mínimo de log
+  bool category_enabled[EMU_LOG_CAT_COUNT]; // Estado de cada categoria
+  bool use_colors;                          // Usar cores no console
+  char timestamp[32];                       // Buffer para timestamp
+} log_state;
+
+/**
+ * @brief Obtém o timestamp atual formatado
+ * @return String com o timestamp
+ */
+static const char *get_timestamp(void) {
+  time_t now;
+  struct tm *timeinfo;
+
+  time(&now);
+  timeinfo = localtime(&now);
+
+  strftime(log_state.timestamp, sizeof(log_state.timestamp),
+           "%Y-%m-%d %H:%M:%S", timeinfo);
+
+  return log_state.timestamp;
+}
+
+/**
+ * @brief Inicializa o sistema de log
+ */
+bool emu_log_init(const char *log_file) {
+  // Inicializa o estado
+  memset(&log_state, 0, sizeof(log_state));
+  log_state.level = EMU_LOG_LEVEL_INFO;
+  log_state.use_colors = true;
+
+  // Habilita todas as categorias por padrão
+  for (int i = 0; i < EMU_LOG_CAT_COUNT; i++) {
+    log_state.category_enabled[i] = true;
+  }
+
+  // Abre o arquivo de log se especificado
+  if (log_file) {
+    log_state.file = fopen(log_file, "w");
+    if (!log_state.file) {
+      fprintf(stderr, "Erro ao abrir arquivo de log: %s\n", log_file);
+      return false;
+    }
+  }
+
+  // Log inicial
+  emu_log_message(EMU_LOG_LEVEL_INFO, EMU_LOG_CAT_CORE, __FILE__, __LINE__,
+                  __func__, "Sistema de log inicializado");
+
+  return true;
+}
+
+/**
+ * @brief Finaliza o sistema de log
+ */
+void emu_log_shutdown(void) {
+  if (log_state.file) {
+    emu_log_message(EMU_LOG_LEVEL_INFO, EMU_LOG_CAT_CORE, __FILE__, __LINE__,
+                    __func__, "Sistema de log finalizado");
+    fclose(log_state.file);
+    log_state.file = NULL;
+  }
+}
+
+/**
+ * @brief Define o nível mínimo de log
+ */
+void emu_log_set_level(emu_log_level_t level) {
+  if (level >= EMU_LOG_LEVEL_ERROR && level <= EMU_LOG_LEVEL_TRACE) {
+    log_state.level = level;
+    emu_log_message(EMU_LOG_LEVEL_INFO, EMU_LOG_CAT_CORE, __FILE__, __LINE__,
+                    __func__, "Nível de log alterado para %s",
+                    level_strings[level]);
+  }
+}
+
+/**
+ * @brief Habilita ou desabilita uma categoria de log
+ */
+void emu_log_set_category_enabled(int category, bool enabled) {
+  if (category >= 0 && category < EMU_LOG_CAT_COUNT) {
+    log_state.category_enabled[category] = enabled;
+    emu_log_message(EMU_LOG_LEVEL_INFO, EMU_LOG_CAT_CORE, __FILE__, __LINE__,
+                    __func__, "Categoria %s %s",
+                    emu_log_category_names[category],
+                    enabled ? "habilitada" : "desabilitada");
+  }
+}
+
+/**
+ * @brief Registra uma mensagem de log com argumentos variáveis
+ */
+void emu_log_message_v(emu_log_level_t level, int category, const char *file,
+                       int line, const char *func, const char *fmt,
+                       va_list args) {
+  // Verifica o nível e categoria
+  if (level > log_state.level || !log_state.category_enabled[category]) {
+    return;
+  }
+
+  // Buffer para a mensagem formatada
+  char message[1024];
+  vsnprintf(message, sizeof(message), fmt, args);
+
+  // Obtém apenas o nome do arquivo sem o path
+  const char *filename = strrchr(file, '/');
+  if (filename) {
+    filename++;
+  } else {
+    filename = file;
+  }
+
+  // Formata a mensagem de log
+  char full_message[2048];
+  snprintf(full_message, sizeof(full_message), "%s [%s] [%s] %s:%d %s(): %s\n",
+           get_timestamp(), level_strings[level],
+           emu_log_category_names[category], filename, line, func, message);
+
+  // Escreve no arquivo se estiver aberto
+  if (log_state.file) {
+    fputs(full_message, log_state.file);
+    fflush(log_state.file);
+  }
+
+  // Escreve no console com cores se habilitado
+  if (log_state.use_colors) {
+    fprintf(stderr, "%s%s\x1b[0m", level_colors[level], full_message);
+  } else {
+    fputs(full_message, stderr);
+  }
+}
+
+/**
+ * @brief Registra uma mensagem de log
+ */
+void emu_log_message(emu_log_level_t level, int category, const char *file,
+                     int line, const char *func, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  emu_log_message_v(level, category, file, line, func, fmt, args);
+  va_end(args);
+}

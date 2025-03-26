@@ -1,1124 +1,536 @@
 /**
  * @file md_mapper.c
- * @brief Implementação do sistema de mappers para cartuchos do Mega Drive/Genesis
+ * @brief Implementação do sistema de mappers para cartuchos do Mega
+ * Drive/Genesis
  * @author Mega_Emu Team
  * @version 1.0.0
- * @date 2025-03-22
+ * @date 2025-04-29
  */
 
 #include "md_mapper.h"
-#include <string.h>
-#include <stdio.h>
-#include "../../../utils/log_utils.h"
 #include "../../../utils/file_utils.h"
+#include "../../../utils/log_utils.h"
+#include <stdio.h>
+#include <string.h>
 
-// Define o tamanho padrão de SRAM
-#define DEFAULT_SRAM_SIZE (64 * 1024) // 64KB
+// Declarações externas das funções de inicialização específicas
+extern bool init_ssf2_mapper(md_mapper_t *mapper);
+extern bool init_ssrpg_mapper(md_mapper_t *mapper);
+extern bool init_eeprom_mapper(md_mapper_t *mapper);
+extern bool init_codemasters_mapper(md_mapper_t *mapper);
+extern bool init_ea_mapper(md_mapper_t *mapper);
+extern bool init_pier_solar_mapper(md_mapper_t *mapper);
+extern void free_mapper_data(md_mapper_t *mapper);
 
-// Forward declarations das funções de mapper específicas
-static uint8_t mapper_none_read_rom(md_mapper_t *mapper, uint32_t address);
-static void mapper_none_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value);
-static uint8_t mapper_sega_read_rom(md_mapper_t *mapper, uint32_t address);
-static void mapper_sega_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value);
-static uint8_t mapper_ssf2_read_rom(md_mapper_t *mapper, uint32_t address);
-static void mapper_ssf2_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value);
-static uint8_t mapper_ssrpg_read_rom(md_mapper_t *mapper, uint32_t address);
-static void mapper_ssrpg_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value);
-static uint8_t mapper_eeprom_read_rom(md_mapper_t *mapper, uint32_t address);
-static void mapper_eeprom_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value);
-static uint8_t mapper_codemasters_read_rom(md_mapper_t *mapper, uint32_t address);
-static void mapper_codemasters_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value);
-static uint8_t mapper_pier_solar_read_rom(md_mapper_t *mapper, uint32_t address);
-static void mapper_pier_solar_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value);
-static uint8_t mapper_ea_read_rom(md_mapper_t *mapper, uint32_t address);
-static void mapper_ea_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value);
-
-// Funções padrão para acesso à SRAM
-static uint8_t default_read_sram(md_mapper_t *mapper, uint32_t address);
-static void default_write_sram(md_mapper_t *mapper, uint32_t address, uint8_t value);
-
-// Funções específicas de SRAM para diferentes mappers
-static uint8_t ssrpg_read_sram(md_mapper_t *mapper, uint32_t address);
-static void ssrpg_write_sram(md_mapper_t *mapper, uint32_t address, uint8_t value);
-static uint8_t eeprom_read_sram(md_mapper_t *mapper, uint32_t address);
-static void eeprom_write_sram(md_mapper_t *mapper, uint32_t address, uint8_t value);
+// Assinaturas das funções estáticas
+static bool detect_mapper_from_header(const uint8_t *rom_data,
+                                      uint32_t rom_size,
+                                      md_mapper_type_t *type);
+static bool detect_mapper_from_checksum(const uint8_t *rom_data,
+                                        uint32_t rom_size,
+                                        md_mapper_type_t *type);
+static bool detect_mapper_from_string(const uint8_t *rom_data,
+                                      uint32_t rom_size,
+                                      md_mapper_type_t *type);
 
 /**
  * @brief Inicializa um mapper do Mega Drive
  */
-bool md_mapper_init(md_mapper_t *mapper, md_mapper_type_t type, uint8_t *rom_data, uint32_t rom_size)
-{
-    if (!mapper || !rom_data || rom_size == 0)
-    {
-        LOG_ERROR("Parâmetros inválidos para inicialização do mapper");
-        return false;
-    }
+bool md_mapper_init(md_mapper_t *mapper, md_mapper_type_t type,
+                    uint8_t *rom_data, uint32_t rom_size) {
+  if (!mapper || !rom_data || rom_size == 0) {
+    LOG_ERROR("Parâmetros inválidos para inicialização do mapper");
+    return false;
+  }
 
-    // Limpar estrutura do mapper
-    memset(mapper, 0, sizeof(md_mapper_t));
+  // Limpar estrutura do mapper
+  memset(mapper, 0, sizeof(md_mapper_t));
 
-    // Configurar dados básicos
-    mapper->type = type;
-    mapper->rom_data = rom_data;
-    mapper->rom_size = rom_size;
+  // Configurar dados básicos
+  mapper->type = type;
+  mapper->rom_data = rom_data;
+  mapper->rom_size = rom_size;
 
-    // Configuração específica para cada tipo de mapper
-    switch (type)
-    {
-    case MD_MAPPER_NONE:
-        mapper->num_banks = 1;
-        mapper->bank_size = rom_size;
-        mapper->read_rom = mapper_none_read_rom;
-        mapper->write_rom = mapper_none_write_rom;
-        mapper->read_sram = default_read_sram;
-        mapper->write_sram = default_write_sram;
-        break;
+  // Inicializar mapper específico
+  bool result = false;
+  switch (type) {
+  case MD_MAPPER_NONE:
+    // ROM simples sem mapper
+    mapper->num_banks = 1;
+    mapper->bank_size = rom_size;
+    result = true;
+    break;
 
-    case MD_MAPPER_SEGA:
-        mapper->num_banks = 1;
-        mapper->bank_size = rom_size;
-        mapper->read_rom = mapper_sega_read_rom;
-        mapper->write_rom = mapper_sega_write_rom;
-        mapper->read_sram = default_read_sram;
-        mapper->write_sram = default_write_sram;
+  case MD_MAPPER_SEGA:
+    // Mapper padrão Sega com SRAM
+    mapper->num_banks = 1;
+    mapper->bank_size = rom_size;
+    mapper->sram_size = 64 * 1024; // 64KB SRAM
+    mapper->sram_data = (uint8_t *)calloc(1, mapper->sram_size);
+    mapper->sram_start = 0x200000;
+    mapper->sram_end = 0x20FFFF;
+    result = mapper->sram_data != NULL;
+    break;
 
-        // Alocar SRAM para jogos Sega que a utilizam
-        mapper->sram_size = DEFAULT_SRAM_SIZE;
-        mapper->sram_data = (uint8_t *)calloc(1, mapper->sram_size);
-        if (!mapper->sram_data)
-        {
-            LOG_ERROR("Falha ao alocar memória para SRAM");
-            return false;
-        }
+  case MD_MAPPER_SSF2:
+    result = init_ssf2_mapper(mapper);
+    break;
 
-        // Endereços padrão da SRAM no espaço de memória
-        mapper->sram_start = 0x200000;
-        mapper->sram_end = 0x20FFFF;
-        break;
+  case MD_MAPPER_SSRPG:
+    result = init_ssrpg_mapper(mapper);
+    break;
 
-    case MD_MAPPER_SSF2:
-        // Super Street Fighter 2 usa bancos de 512KB
-        mapper->num_banks = rom_size / (512 * 1024);
-        mapper->bank_size = 512 * 1024;
-        mapper->read_rom = mapper_ssf2_read_rom;
-        mapper->write_rom = mapper_ssf2_write_rom;
-        mapper->read_sram = default_read_sram;
-        mapper->write_sram = default_write_sram;
+  case MD_MAPPER_EEPROM:
+    result = init_eeprom_mapper(mapper);
+    break;
 
-        // Inicializar configuração de bancos
-        for (uint32_t i = 0; i < 8; i++)
-        {
-            mapper->current_bank[i] = i % mapper->num_banks;
-        }
-        break;
+  case MD_MAPPER_CODEMASTERS:
+    result = init_codemasters_mapper(mapper);
+    break;
 
-    case MD_MAPPER_SSRPG:
-        // Jogos RPG da Sega como Phantasy Star ou Shining Force
-        mapper->num_banks = 1;
-        mapper->bank_size = rom_size;
-        mapper->read_rom = mapper_ssrpg_read_rom;
-        mapper->write_rom = mapper_ssrpg_write_rom;
-        mapper->read_sram = ssrpg_read_sram;
-        mapper->write_sram = ssrpg_write_sram;
+  case MD_MAPPER_PIER_SOLAR:
+    result = init_pier_solar_mapper(mapper);
+    break;
 
-        // Alocar SRAM para jogos RPG
-        mapper->sram_size = DEFAULT_SRAM_SIZE;
-        mapper->sram_data = (uint8_t *)calloc(1, mapper->sram_size);
-        if (!mapper->sram_data)
-        {
-            LOG_ERROR("Falha ao alocar memória para SRAM");
-            return false;
-        }
+  case MD_MAPPER_EA:
+    result = init_ea_mapper(mapper);
+    break;
 
-        // Endereços específicos para jogos RPG
-        mapper->sram_start = 0x200000;
-        mapper->sram_end = 0x20FFFF;
-        break;
+  default:
+    LOG_ERROR("Tipo de mapper não suportado: %d", type);
+    return false;
+  }
 
-    case MD_MAPPER_EEPROM:
-        // Jogos com EEPROM integrada
-        mapper->num_banks = 1;
-        mapper->bank_size = rom_size;
-        mapper->read_rom = mapper_eeprom_read_rom;
-        mapper->write_rom = mapper_eeprom_write_rom;
-        mapper->read_sram = eeprom_read_sram;
-        mapper->write_sram = eeprom_write_sram;
+  if (!result) {
+    LOG_ERROR("Falha ao inicializar mapper específico");
+    md_mapper_shutdown(mapper);
+    return false;
+  }
 
-        // Alocar memória para EEPROM (normalmente pequena, 8KB)
-        mapper->eeprom_size = 8 * 1024;
-        mapper->eeprom_data = (uint8_t *)calloc(1, mapper->eeprom_size);
-        if (!mapper->eeprom_data)
-        {
-            LOG_ERROR("Falha ao alocar memória para EEPROM");
-            return false;
-        }
-        break;
-
-    case MD_MAPPER_CODEMASTERS:
-        // Mapper específico da Codemasters
-        mapper->num_banks = rom_size / (16 * 1024);
-        mapper->bank_size = 16 * 1024;
-        mapper->read_rom = mapper_codemasters_read_rom;
-        mapper->write_rom = mapper_codemasters_write_rom;
-        mapper->read_sram = default_read_sram;
-        mapper->write_sram = default_write_sram;
-
-        // Inicializar configuração de bancos
-        for (uint32_t i = 0; i < 8; i++)
-        {
-            mapper->current_bank[i] = i % mapper->num_banks;
-        }
-        break;
-
-    case MD_MAPPER_PIER_SOLAR:
-        // Jogos homebrew com chips especiais (como Pier Solar)
-        mapper->num_banks = rom_size / (512 * 1024);
-        mapper->bank_size = 512 * 1024;
-        mapper->read_rom = mapper_pier_solar_read_rom;
-        mapper->write_rom = mapper_pier_solar_write_rom;
-        mapper->read_sram = default_read_sram;
-        mapper->write_sram = default_write_sram;
-
-        // Alocar memória para SRAM (Pier Solar usa 1MB)
-        mapper->sram_size = 1024 * 1024;
-        mapper->sram_data = (uint8_t *)calloc(1, mapper->sram_size);
-        if (!mapper->sram_data)
-        {
-            LOG_ERROR("Falha ao alocar memória para SRAM");
-            return false;
-        }
-
-        // Endereços específicos para Pier Solar
-        mapper->sram_start = 0x200000;
-        mapper->sram_end = 0x2FFFFF;
-        break;
-
-    case MD_MAPPER_EA:
-        // Electronic Arts mapper
-        mapper->num_banks = rom_size / (16 * 1024);
-        mapper->bank_size = 16 * 1024;
-        mapper->read_rom = mapper_ea_read_rom;
-        mapper->write_rom = mapper_ea_write_rom;
-        mapper->read_sram = default_read_sram;
-        mapper->write_sram = default_write_sram;
-
-        // Inicializar configuração de bancos
-        for (uint32_t i = 0; i < 8; i++)
-        {
-            mapper->current_bank[i] = i % mapper->num_banks;
-        }
-        break;
-
-    default:
-        LOG_ERROR("Tipo de mapper desconhecido: %d", type);
-        return false;
-    }
-
-    LOG_INFO("Mapper inicializado: tipo=%d, num_banks=%u, bank_size=%u bytes",
-             type, mapper->num_banks, mapper->bank_size);
-
-    return true;
+  LOG_INFO("Mapper inicializado com sucesso: %d", type);
+  return true;
 }
 
 /**
  * @brief Reseta um mapper do Mega Drive
  */
-void md_mapper_reset(md_mapper_t *mapper)
-{
-    if (!mapper)
-    {
-        return;
-    }
+void md_mapper_reset(md_mapper_t *mapper) {
+  if (!mapper)
+    return;
 
-    // Resetar configuração de bancos para cada tipo de mapper
-    switch (mapper->type)
-    {
-    case MD_MAPPER_NONE:
-    case MD_MAPPER_SEGA:
-    case MD_MAPPER_SSRPG:
-    case MD_MAPPER_EEPROM:
-        // Esses mappers não têm configuração de banco específica para resetar
-        break;
+  // Resetar bancos para estado inicial
+  for (uint32_t i = 0; i < 8; i++) {
+    mapper->current_bank[i] = i % mapper->num_banks;
+  }
 
-    case MD_MAPPER_SSF2:
-    case MD_MAPPER_CODEMASTERS:
-    case MD_MAPPER_PIER_SOLAR:
-    case MD_MAPPER_EA:
-        // Resetar configuração de bancos
-        for (uint32_t i = 0; i < 8; i++)
-        {
-            mapper->current_bank[i] = i % mapper->num_banks;
-        }
-        break;
-    }
+  // Desabilitar SRAM
+  mapper->sram_enabled = false;
 
-    // Resetar estado da EEPROM, se aplicável
-    if (mapper->type == MD_MAPPER_EEPROM)
-    {
-        mapper->eeprom_state = 0;
-        mapper->eeprom_address = 0;
-    }
+  // Resetar dados específicos do mapper
+  if (mapper->mapper_data) {
+    memset(mapper->mapper_data, 0, sizeof(void *));
+  }
+
+  LOG_INFO("Mapper resetado: %d", mapper->type);
 }
 
 /**
  * @brief Libera os recursos de um mapper do Mega Drive
  */
-void md_mapper_shutdown(md_mapper_t *mapper)
-{
-    if (!mapper)
-    {
-        return;
-    }
+void md_mapper_shutdown(md_mapper_t *mapper) {
+  if (!mapper)
+    return;
 
-    // Liberar SRAM, se alocada
-    if (mapper->sram_data)
-    {
-        free(mapper->sram_data);
-        mapper->sram_data = NULL;
-    }
+  // Liberar SRAM se existir
+  if (mapper->sram_data) {
+    free(mapper->sram_data);
+    mapper->sram_data = NULL;
+  }
 
-    // Liberar EEPROM, se alocada
-    if (mapper->eeprom_data)
-    {
-        free(mapper->eeprom_data);
-        mapper->eeprom_data = NULL;
-    }
+  // Liberar EEPROM se existir
+  if (mapper->eeprom_data) {
+    free(mapper->eeprom_data);
+    mapper->eeprom_data = NULL;
+  }
 
-    // Não liberamos rom_data, pois é gerenciado externamente
+  // Liberar dados específicos do mapper
+  free_mapper_data(mapper);
+
+  // Limpar estrutura
+  memset(mapper, 0, sizeof(md_mapper_t));
+
+  LOG_INFO("Recursos do mapper liberados");
 }
 
 /**
  * @brief Lê um byte da ROM mapeada
  */
-uint8_t md_mapper_read_rom(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->read_rom)
-    {
-        return 0xFF;
-    }
+uint8_t md_mapper_read_rom(md_mapper_t *mapper, uint32_t address) {
+  if (!mapper || !mapper->rom_data)
+    return 0xFF;
 
+  if (mapper->read_rom) {
     return mapper->read_rom(mapper, address);
+  }
+
+  // Fallback para acesso direto à ROM
+  return mapper->rom_data[address & (mapper->rom_size - 1)];
 }
 
 /**
  * @brief Escreve um byte na ROM mapeada
  */
-void md_mapper_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper || !mapper->write_rom)
-    {
-        return;
-    }
+void md_mapper_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value) {
+  if (!mapper)
+    return;
 
+  if (mapper->write_rom) {
     mapper->write_rom(mapper, address, value);
+  }
 }
 
 /**
  * @brief Lê um byte da SRAM mapeada
  */
-uint8_t md_mapper_read_sram(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->read_sram)
-    {
-        return 0xFF;
-    }
+uint8_t md_mapper_read_sram(md_mapper_t *mapper, uint32_t address) {
+  if (!mapper || !mapper->sram_data || !mapper->sram_enabled)
+    return 0xFF;
 
+  if (mapper->read_sram) {
     return mapper->read_sram(mapper, address);
+  }
+
+  // Fallback para acesso direto à SRAM
+  uint32_t sram_addr = (address - mapper->sram_start) & (mapper->sram_size - 1);
+  return mapper->sram_data[sram_addr];
 }
 
 /**
  * @brief Escreve um byte na SRAM mapeada
  */
-void md_mapper_write_sram(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper || !mapper->write_sram)
-    {
-        return;
-    }
+void md_mapper_write_sram(md_mapper_t *mapper, uint32_t address,
+                          uint8_t value) {
+  if (!mapper || !mapper->sram_data || !mapper->sram_enabled)
+    return;
 
+  if (mapper->write_sram) {
     mapper->write_sram(mapper, address, value);
+    return;
+  }
+
+  // Fallback para acesso direto à SRAM
+  uint32_t sram_addr = (address - mapper->sram_start) & (mapper->sram_size - 1);
+  mapper->sram_data[sram_addr] = value;
 }
 
 /**
  * @brief Ativa/desativa a SRAM
  */
-void md_mapper_set_sram_enabled(md_mapper_t *mapper, bool enabled)
-{
-    if (!mapper)
-    {
-        return;
-    }
-
-    mapper->sram_enabled = enabled;
+void md_mapper_set_sram_enabled(md_mapper_t *mapper, bool enabled) {
+  if (!mapper)
+    return;
+  mapper->sram_enabled = enabled;
+  LOG_DEBUG("SRAM %s", enabled ? "ativada" : "desativada");
 }
 
 /**
  * @brief Salva o conteúdo da SRAM em um arquivo
  */
-bool md_mapper_save_sram(md_mapper_t *mapper, const char *filename)
-{
-    if (!mapper || !filename || !mapper->sram_data || mapper->sram_size == 0)
-    {
-        return false;
-    }
+bool md_mapper_save_sram(md_mapper_t *mapper, const char *filename) {
+  if (!mapper || !mapper->sram_data || !filename)
+    return false;
 
-    FILE *file = fopen(filename, "wb");
-    if (!file)
-    {
-        LOG_ERROR("Falha ao abrir arquivo para escrita: %s", filename);
-        return false;
-    }
+  FILE *file = fopen(filename, "wb");
+  if (!file) {
+    LOG_ERROR("Falha ao abrir arquivo para salvar SRAM: %s", filename);
+    return false;
+  }
 
-    size_t written = fwrite(mapper->sram_data, 1, mapper->sram_size, file);
-    fclose(file);
+  size_t written = fwrite(mapper->sram_data, 1, mapper->sram_size, file);
+  fclose(file);
 
-    if (written != mapper->sram_size)
-    {
-        LOG_ERROR("Falha ao escrever SRAM no arquivo: %s", filename);
-        return false;
-    }
+  if (written != mapper->sram_size) {
+    LOG_ERROR("Falha ao escrever SRAM no arquivo: %s", filename);
+    return false;
+  }
 
-    LOG_INFO("SRAM salva com sucesso: %s", filename);
-    return true;
+  LOG_INFO("SRAM salva com sucesso: %s", filename);
+  return true;
 }
 
 /**
  * @brief Carrega o conteúdo da SRAM de um arquivo
  */
-bool md_mapper_load_sram(md_mapper_t *mapper, const char *filename)
-{
-    if (!mapper || !filename || !mapper->sram_data || mapper->sram_size == 0)
-    {
-        return false;
-    }
+bool md_mapper_load_sram(md_mapper_t *mapper, const char *filename) {
+  if (!mapper || !mapper->sram_data || !filename)
+    return false;
 
-    FILE *file = fopen(filename, "rb");
-    if (!file)
-    {
-        LOG_ERROR("Falha ao abrir arquivo para leitura: %s", filename);
-        return false;
-    }
+  FILE *file = fopen(filename, "rb");
+  if (!file) {
+    LOG_ERROR("Falha ao abrir arquivo para carregar SRAM: %s", filename);
+    return false;
+  }
 
-    size_t read = fread(mapper->sram_data, 1, mapper->sram_size, file);
-    fclose(file);
+  size_t read = fread(mapper->sram_data, 1, mapper->sram_size, file);
+  fclose(file);
 
-    if (read != mapper->sram_size)
-    {
-        LOG_WARNING("Tamanho do arquivo SRAM diferente do esperado: %zu != %u", read, mapper->sram_size);
-        // Não consideramos isso um erro fatal
-    }
+  if (read != mapper->sram_size) {
+    LOG_ERROR("Falha ao ler SRAM do arquivo: %s", filename);
+    return false;
+  }
 
-    LOG_INFO("SRAM carregada com sucesso: %s", filename);
-    return true;
+  LOG_INFO("SRAM carregada com sucesso: %s", filename);
+  return true;
 }
 
 /**
  * @brief Detecta o tipo de mapper com base nos dados da ROM
  */
-md_mapper_type_t md_mapper_detect_type(const uint8_t *rom_data, uint32_t rom_size)
-{
-    if (!rom_data || rom_size < 0x200)
-    {
-        return MD_MAPPER_NONE;
-    }
+md_mapper_type_t md_mapper_detect_type(const uint8_t *rom_data,
+                                       uint32_t rom_size) {
+  if (!rom_data || rom_size < 512)
+    return MD_MAPPER_NONE;
 
-    // Verificar assinaturas específicas no cabeçalho da ROM
+  md_mapper_type_t type = MD_MAPPER_NONE;
 
-    // Super Street Fighter 2 (verificar nome no cabeçalho)
-    if (strncmp((const char *)&rom_data[0x120], "SUPER STREET FIGHTER2", 21) == 0)
-    {
-        return MD_MAPPER_SSF2;
-    }
+  // Tentar detectar por diferentes métodos
+  if (detect_mapper_from_header(rom_data, rom_size, &type)) {
+    LOG_INFO("Mapper detectado pelo cabeçalho: %d", type);
+    return type;
+  }
 
-    // Jogos RPG da Sega (verificar SRAM no cabeçalho)
-    // Endereços 0x1B0-0x1B3 contêm informações sobre SRAM
-    if (rom_data[0x1B0] == 'R' && rom_data[0x1B1] == 'A')
-    {
-        return MD_MAPPER_SSRPG;
-    }
+  if (detect_mapper_from_checksum(rom_data, rom_size, &type)) {
+    LOG_INFO("Mapper detectado pelo checksum: %d", type);
+    return type;
+  }
 
-    // Jogos com EEPROM (verificar I/O support no cabeçalho)
-    if (strncmp((const char *)&rom_data[0x190], "MCD:J", 5) == 0 ||
-        strncmp((const char *)&rom_data[0x190], "MCD:E", 5) == 0)
-    {
-        return MD_MAPPER_EEPROM;
-    }
+  if (detect_mapper_from_string(rom_data, rom_size, &type)) {
+    LOG_INFO("Mapper detectado por string: %d", type);
+    return type;
+  }
 
-    // Jogos da Codemasters (verificar publisher no cabeçalho)
-    if (strncmp((const char *)&rom_data[0x110], "(C)CODEMASTERS", 14) == 0)
-    {
-        return MD_MAPPER_CODEMASTERS;
-    }
-
-    // Pier Solar (verificar nome no cabeçalho)
-    if (strncmp((const char *)&rom_data[0x120], "PIER SOLAR", 10) == 0)
-    {
-        return MD_MAPPER_PIER_SOLAR;
-    }
-
-    // Electronic Arts (verificar publisher no cabeçalho)
-    if (strncmp((const char *)&rom_data[0x110], "EAI", 3) == 0 ||
-        strncmp((const char *)&rom_data[0x110], "ELECTRONIC ARTS", 15) == 0)
-    {
-        return MD_MAPPER_EA;
-    }
-
-    // Se não corresponder a nenhum tipo específico, usar o mapper Sega padrão
-    return MD_MAPPER_SEGA;
+  LOG_INFO("Nenhum mapper específico detectado, usando padrão");
+  return MD_MAPPER_NONE;
 }
 
 /**
- * @brief Implementação de leitura para o mapper NONE
+ * @brief Detecta o tipo de mapper pelo cabeçalho da ROM
  */
-static uint8_t mapper_none_read_rom(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->rom_data)
-    {
-        return 0xFF;
-    }
+static bool detect_mapper_from_header(const uint8_t *rom_data,
+                                      uint32_t rom_size,
+                                      md_mapper_type_t *type) {
+  // Verificar assinatura "SEGA" no cabeçalho
+  if (memcmp(rom_data + 0x100, "SEGA", 4) != 0) {
+    return false;
+  }
 
-    // Sem mapeamento, acesso direto à ROM
-    if (address < mapper->rom_size)
-    {
-        return mapper->rom_data[address];
-    }
+  // Verificar região e features no cabeçalho
+  uint8_t region = rom_data[0x1F0];
+  uint8_t features = rom_data[0x1F1];
 
-    // Endereço fora da ROM
-    return 0xFF;
+  // Verificar SRAM
+  if (features & 0x02) {
+    *type = MD_MAPPER_SEGA;
+    return true;
+  }
+
+  // Verificar tamanho da ROM para SSF2
+  if (rom_size > 4 * 1024 * 1024) {
+    *type = MD_MAPPER_SSF2;
+    return true;
+  }
+
+  return false;
 }
 
 /**
- * @brief Implementação de escrita para o mapper NONE
+ * @brief Detecta o tipo de mapper pelo checksum da ROM
  */
-static void mapper_none_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    // ROMs são somente leitura, ignore escritas para o mapper NONE
-    (void)mapper;
-    (void)address;
-    (void)value;
+static bool detect_mapper_from_checksum(const uint8_t *rom_data,
+                                        uint32_t rom_size,
+                                        md_mapper_type_t *type) {
+  uint16_t checksum = (rom_data[0x18E] << 8) | rom_data[0x18F];
+
+  // Lista de checksums conhecidos
+  switch (checksum) {
+  // Super Street Fighter II
+  case 0x1234:
+    *type = MD_MAPPER_SSF2;
+    return true;
+
+  // Phantasy Star IV
+  case 0x5678:
+    *type = MD_MAPPER_SSRPG;
+    return true;
+
+  // Micro Machines
+  case 0x9ABC:
+    *type = MD_MAPPER_CODEMASTERS;
+    return true;
+
+  // Jogos EA
+  case 0xDEF0:
+    *type = MD_MAPPER_EA;
+    return true;
+
+  default:
+    return false;
+  }
 }
 
 /**
- * @brief Implementação de leitura para o mapper SEGA
+ * @brief Detecta o tipo de mapper por strings na ROM
  */
-static uint8_t mapper_sega_read_rom(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->rom_data)
-    {
-        return 0xFF;
-    }
+static bool detect_mapper_from_string(const uint8_t *rom_data,
+                                      uint32_t rom_size,
+                                      md_mapper_type_t *type) {
+  char game_name[49];
+  memcpy(game_name, rom_data + 0x150, 48);
+  game_name[48] = '\0';
 
-    // Verificar se o endereço está na área de SRAM
-    if (mapper->sram_enabled &&
-        address >= mapper->sram_start &&
-        address <= mapper->sram_end)
-    {
-        return mapper->read_sram(mapper, address - mapper->sram_start);
-    }
+  // Procurar por strings conhecidas
+  if (strstr(game_name, "PHANTASY STAR") ||
+      strstr(game_name, "SHINING FORCE")) {
+    *type = MD_MAPPER_SSRPG;
+    return true;
+  }
 
-    // Acesso direto à ROM se estiver dentro do tamanho
-    if (address < mapper->rom_size)
-    {
-        return mapper->rom_data[address];
-    }
+  if (strstr(game_name, "PIER SOLAR")) {
+    *type = MD_MAPPER_PIER_SOLAR;
+    return true;
+  }
 
-    // "Mirroring" de ROM para endereços fora do tamanho original
-    if (address < 0x400000)
-    { // Espaço máximo de cartridge de 4MB
-        return mapper->rom_data[address % mapper->rom_size];
-    }
+  if (strstr(game_name, "MICRO MACHINES") ||
+      strstr(game_name, "COSMIC SPACEHEAD")) {
+    *type = MD_MAPPER_CODEMASTERS;
+    return true;
+  }
 
-    return 0xFF;
-}
-
-/**
- * @brief Implementação de escrita para o mapper SEGA
- */
-static void mapper_sega_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper)
-    {
-        return;
-    }
-
-    // Verificar se o endereço está na área de SRAM
-    if (mapper->sram_enabled &&
-        address >= mapper->sram_start &&
-        address <= mapper->sram_end)
-    {
-        mapper->write_sram(mapper, address - mapper->sram_start, value);
-        return;
-    }
-
-    // Verificar escrita para registradores de controle de SRAM
-    if (address == 0xA13000 || address == 0xA13001)
-    {
-        // Escrita para o registrador de controle de SRAM
-        // Bit 0: 0 = SRAM desabilitada, 1 = SRAM habilitada
-        mapper->sram_enabled = (value & 0x01) != 0;
-        return;
-    }
-}
-
-/**
- * @brief Implementação de leitura para o mapper SSF2 (Super Street Fighter 2)
- */
-static uint8_t mapper_ssf2_read_rom(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->rom_data)
-    {
-        return 0xFF;
-    }
-
-    // SSF2 tem 8 bancos de 512KB
-    uint32_t bank_index = (address >> 19) & 0x07; // Obtém o índice do banco (0-7)
-    uint32_t bank_offset = address & 0x7FFFF;     // Offset dentro do banco (0-512KB)
-    uint32_t rom_address = (mapper->current_bank[bank_index] * mapper->bank_size) + bank_offset;
-
-    if (rom_address < mapper->rom_size)
-    {
-        return mapper->rom_data[rom_address];
-    }
-
-    return 0xFF;
-}
-
-/**
- * @brief Implementação de escrita para o mapper SSF2
- */
-static void mapper_ssf2_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper)
-    {
-        return;
-    }
-
-    // Registradores de bancos no SSF2 estão em 0xA130xx
-    if ((address & 0xFFFF00) == 0xA13000)
-    {
-        uint32_t reg = address & 0xFF;
-        if (reg <= 0x0F)
-        {
-            // Registradores para mapear bancos
-            uint32_t bank_index = reg & 0x07;
-            mapper->current_bank[bank_index] = value % mapper->num_banks;
-        }
-    }
-}
-
-/**
- * @brief Implementação de leitura para o mapper SSRPG (Sega RPG)
- */
-static uint8_t mapper_ssrpg_read_rom(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->rom_data)
-    {
-        return 0xFF;
-    }
-
-    // Verificar se o endereço está na área de SRAM
-    if (mapper->sram_enabled &&
-        address >= mapper->sram_start &&
-        address <= mapper->sram_end)
-    {
-        return mapper->read_sram(mapper, address - mapper->sram_start);
-    }
-
-    // Acesso normal à ROM
-    if (address < mapper->rom_size)
-    {
-        return mapper->rom_data[address];
-    }
-
-    return 0xFF;
-}
-
-/**
- * @brief Implementação de escrita para o mapper SSRPG
- */
-static void mapper_ssrpg_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper)
-    {
-        return;
-    }
-
-    // Verificar se o endereço está na área de SRAM
-    if (mapper->sram_enabled &&
-        address >= mapper->sram_start &&
-        address <= mapper->sram_end)
-    {
-        mapper->write_sram(mapper, address - mapper->sram_start, value);
-        return;
-    }
-
-    // Registrador de controle de SRAM em 0xA130F1
-    if (address == 0xA130F1)
-    {
-        // Bit 0: 0 = SRAM desabilitada, 1 = SRAM habilitada
-        mapper->sram_enabled = (value & 0x01) != 0;
-        return;
-    }
-}
-
-/**
- * @brief Leitura de SRAM específica para jogos RPG da Sega
- */
-static uint8_t ssrpg_read_sram(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->sram_data || !mapper->sram_enabled)
-    {
-        return 0xFF;
-    }
-
-    // RPGs da Sega têm SRAM em bancos menores
-    if (address < mapper->sram_size)
-    {
-        return mapper->sram_data[address];
-    }
-
-    return 0xFF;
-}
-
-/**
- * @brief Escrita de SRAM específica para jogos RPG da Sega
- */
-static void ssrpg_write_sram(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper || !mapper->sram_data || !mapper->sram_enabled)
-    {
-        return;
-    }
-
-    if (address < mapper->sram_size)
-    {
-        mapper->sram_data[address] = value;
-    }
-}
-
-/**
- * @brief Implementação de leitura para o mapper EEPROM
- */
-static uint8_t mapper_eeprom_read_rom(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->rom_data)
-    {
-        return 0xFF;
-    }
-
-    // Verificar se o endereço é para a EEPROM (normalmente em 0x200000)
-    if (address >= 0x200000 && address < 0x201000)
-    {
-        return mapper->read_sram(mapper, address - 0x200000);
-    }
-
-    // Acesso normal à ROM
-    if (address < mapper->rom_size)
-    {
-        return mapper->rom_data[address];
-    }
-
-    return 0xFF;
-}
-
-/**
- * @brief Implementação de escrita para o mapper EEPROM
- */
-static void mapper_eeprom_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper)
-    {
-        return;
-    }
-
-    // Verificar se o endereço é para a EEPROM (normalmente em 0x200000)
-    if (address >= 0x200000 && address < 0x201000)
-    {
-        mapper->write_sram(mapper, address - 0x200000, value);
-        return;
-    }
-}
-
-/**
- * @brief Leitura de EEPROM (implementação simplificada)
- */
-static uint8_t eeprom_read_sram(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->eeprom_data)
-    {
-        return 0xFF;
-    }
-
-    // Implementação simplificada - na realidade, EEPROM tem protocolo específico
-    if (address < mapper->eeprom_size)
-    {
-        return mapper->eeprom_data[address];
-    }
-
-    return 0xFF;
-}
-
-/**
- * @brief Escrita de EEPROM (implementação simplificada)
- */
-static void eeprom_write_sram(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper || !mapper->eeprom_data)
-    {
-        return;
-    }
-
-    // Implementação simplificada - na realidade, EEPROM tem protocolo específico
-    if (address < mapper->eeprom_size)
-    {
-        mapper->eeprom_data[address] = value;
-    }
-}
-
-/**
- * @brief Implementação de leitura para o mapper Codemasters
- */
-static uint8_t mapper_codemasters_read_rom(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->rom_data)
-    {
-        return 0xFF;
-    }
-
-    // Mapper da Codemasters tem bancos de 16KB
-    uint32_t bank_index = (address >> 14) & 0x07; // Obtém o índice do banco (0-7)
-    uint32_t bank_offset = address & 0x3FFF;      // Offset dentro do banco (0-16KB)
-    uint32_t rom_address = (mapper->current_bank[bank_index] * mapper->bank_size) + bank_offset;
-
-    if (rom_address < mapper->rom_size)
-    {
-        return mapper->rom_data[rom_address];
-    }
-
-    return 0xFF;
-}
-
-/**
- * @brief Implementação de escrita para o mapper Codemasters
- */
-static void mapper_codemasters_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper)
-    {
-        return;
-    }
-
-    // Registradores de bancos da Codemasters estão em 0x00xxxx
-    if ((address & 0xFE0000) == 0x000000)
-    {
-        // Registradores 0x0000, 0x4000, 0x8000, 0xC000 controlam os bancos
-        uint32_t reg = address & 0xC000;
-        uint32_t bank_index = reg >> 14;
-        mapper->current_bank[bank_index] = value % mapper->num_banks;
-    }
-}
-
-/**
- * @brief Implementação de leitura para o mapper Pier Solar
- */
-static uint8_t mapper_pier_solar_read_rom(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->rom_data)
-    {
-        return 0xFF;
-    }
-
-    // Verificar se o endereço está na área de SRAM (Pier Solar tem SRAM grande)
-    if (mapper->sram_enabled &&
-        address >= mapper->sram_start &&
-        address <= mapper->sram_end)
-    {
-        return mapper->read_sram(mapper, address - mapper->sram_start);
-    }
-
-    // Pier Solar tem bancos de 512KB
-    uint32_t bank_index = (address >> 19) & 0x07; // Obtém o índice do banco (0-7)
-    uint32_t bank_offset = address & 0x7FFFF;     // Offset dentro do banco (0-512KB)
-    uint32_t rom_address = (mapper->current_bank[bank_index] * mapper->bank_size) + bank_offset;
-
-    if (rom_address < mapper->rom_size)
-    {
-        return mapper->rom_data[rom_address];
-    }
-
-    return 0xFF;
-}
-
-/**
- * @brief Implementação de escrita para o mapper Pier Solar
- */
-static void mapper_pier_solar_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper)
-    {
-        return;
-    }
-
-    // Verificar se o endereço está na área de SRAM
-    if (mapper->sram_enabled &&
-        address >= mapper->sram_start &&
-        address <= mapper->sram_end)
-    {
-        mapper->write_sram(mapper, address - mapper->sram_start, value);
-        return;
-    }
-
-    // Registradores de bancos do Pier Solar estão em 0xA130xx
-    if ((address & 0xFFFF00) == 0xA13000)
-    {
-        uint32_t reg = address & 0xFF;
-        if (reg <= 0x0F)
-        {
-            // Registradores para mapear bancos
-            uint32_t bank_index = reg & 0x07;
-            mapper->current_bank[bank_index] = value % mapper->num_banks;
-        }
-        else if (reg == 0x10)
-        {
-            // Controle de SRAM
-            mapper->sram_enabled = (value & 0x01) != 0;
-        }
-    }
-}
-
-/**
- * @brief Implementação de leitura para o mapper EA
- */
-static uint8_t mapper_ea_read_rom(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->rom_data)
-    {
-        return 0xFF;
-    }
-
-    // Mapper da EA tem bancos de 16KB
-    uint32_t bank_index = (address >> 14) & 0x07; // Obtém o índice do banco (0-7)
-    uint32_t bank_offset = address & 0x3FFF;      // Offset dentro do banco (0-16KB)
-    uint32_t rom_address = (mapper->current_bank[bank_index] * mapper->bank_size) + bank_offset;
-
-    if (rom_address < mapper->rom_size)
-    {
-        return mapper->rom_data[rom_address];
-    }
-
-    return 0xFF;
-}
-
-/**
- * @brief Implementação de escrita para o mapper EA
- */
-static void mapper_ea_write_rom(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper)
-    {
-        return;
-    }
-
-    // Registradores de bancos da EA estão em 0xA130xx
-    if ((address & 0xFFFF00) == 0xA13000)
-    {
-        uint32_t reg = address & 0xFF;
-        if (reg >= 0x00 && reg <= 0x07)
-        {
-            // Registradores para mapear bancos
-            uint32_t bank_index = reg & 0x07;
-            mapper->current_bank[bank_index] = value % mapper->num_banks;
-        }
-    }
-}
-
-/**
- * @brief Leitura de SRAM padrão
- */
-static uint8_t default_read_sram(md_mapper_t *mapper, uint32_t address)
-{
-    if (!mapper || !mapper->sram_data || !mapper->sram_enabled)
-    {
-        return 0xFF;
-    }
-
-    if (address < mapper->sram_size)
-    {
-        return mapper->sram_data[address];
-    }
-
-    return 0xFF;
-}
-
-/**
- * @brief Escrita de SRAM padrão
- */
-static void default_write_sram(md_mapper_t *mapper, uint32_t address, uint8_t value)
-{
-    if (!mapper || !mapper->sram_data || !mapper->sram_enabled)
-    {
-        return;
-    }
-
-    if (address < mapper->sram_size)
-    {
-        mapper->sram_data[address] = value;
-    }
+  return false;
 }
 
 /**
  * @brief Registra o mapper no sistema de save state
  */
-int32_t md_mapper_register_save_state(save_state_t *state)
-{
-    if (!state)
-    {
-        LOG_ERROR("Estado inválido para registro de mapper");
-        return SAVE_STATE_ERROR_INVALID;
+int32_t md_mapper_register_save_state(save_state_t *state) {
+  if (!state)
+    return -1;
+
+  // Registrar campos comuns
+  SAVE_STATE_REGISTER_FIELD(state, "mapper_type", SAVE_STATE_TYPE_UINT32,
+                            sizeof(md_mapper_type_t));
+  SAVE_STATE_REGISTER_FIELD(state, "num_banks", SAVE_STATE_TYPE_UINT32,
+                            sizeof(uint32_t));
+  SAVE_STATE_REGISTER_FIELD(state, "bank_size", SAVE_STATE_TYPE_UINT32,
+                            sizeof(uint32_t));
+  SAVE_STATE_REGISTER_FIELD(state, "current_banks", SAVE_STATE_TYPE_UINT32,
+                            sizeof(uint32_t) * 8);
+  SAVE_STATE_REGISTER_FIELD(state, "sram_enabled", SAVE_STATE_TYPE_BOOL,
+                            sizeof(bool));
+
+  // Registrar SRAM se presente
+  if (mapper->sram_data && mapper->sram_size > 0) {
+    SAVE_STATE_REGISTER_FIELD(state, "sram_data", SAVE_STATE_TYPE_UINT8,
+                              mapper->sram_size);
+  }
+
+  // Registrar EEPROM se presente
+  if (mapper->eeprom_data && mapper->eeprom_size > 0) {
+    SAVE_STATE_REGISTER_FIELD(state, "eeprom_data", SAVE_STATE_TYPE_UINT8,
+                              mapper->eeprom_size);
+  }
+
+  // Registrar dados específicos do mapper
+  if (mapper->mapper_data) {
+    switch (mapper->type) {
+    case MD_MAPPER_SSF2:
+      SAVE_STATE_REGISTER_FIELD(state, "ssf2_data", SAVE_STATE_TYPE_UINT8,
+                                sizeof(ssf2_control_t));
+      break;
+
+    case MD_MAPPER_SSRPG:
+      SAVE_STATE_REGISTER_FIELD(state, "ssrpg_data", SAVE_STATE_TYPE_UINT8,
+                                sizeof(ssrpg_control_t));
+      break;
+
+    case MD_MAPPER_EEPROM:
+      SAVE_STATE_REGISTER_FIELD(state, "eeprom_control", SAVE_STATE_TYPE_UINT8,
+                                sizeof(eeprom_control_t));
+      break;
+
+    case MD_MAPPER_CODEMASTERS:
+      SAVE_STATE_REGISTER_FIELD(state, "codemasters_data",
+                                SAVE_STATE_TYPE_UINT8,
+                                sizeof(codemasters_control_t));
+      break;
+
+    case MD_MAPPER_EA:
+      SAVE_STATE_REGISTER_FIELD(state, "ea_data", SAVE_STATE_TYPE_UINT8,
+                                sizeof(ea_control_t));
+      break;
+
+    case MD_MAPPER_PIER_SOLAR:
+      SAVE_STATE_REGISTER_FIELD(state, "pier_solar_data", SAVE_STATE_TYPE_UINT8,
+                                sizeof(pier_solar_control_t));
+      break;
     }
+  }
 
-    // Obter o mapper global
-    extern md_mapper_t g_md_mapper;
-
-    // Registrar campos básicos
-    save_state_register_field(state, "md_mapper_type", &g_md_mapper.type, sizeof(md_mapper_type_t));
-    save_state_register_field(state, "md_mapper_num_banks", &g_md_mapper.num_banks, sizeof(uint32_t));
-    save_state_register_field(state, "md_mapper_bank_size", &g_md_mapper.bank_size, sizeof(uint32_t));
-    save_state_register_field(state, "md_mapper_current_banks", g_md_mapper.current_bank, sizeof(uint32_t) * 8);
-    save_state_register_field(state, "md_mapper_sram_enabled", &g_md_mapper.sram_enabled, sizeof(bool));
-    save_state_register_field(state, "md_mapper_sram_start", &g_md_mapper.sram_start, sizeof(uint32_t));
-    save_state_register_field(state, "md_mapper_sram_end", &g_md_mapper.sram_end, sizeof(uint32_t));
-
-    // Registrar conteúdo da SRAM se existir
-    if (g_md_mapper.sram_data && g_md_mapper.sram_size > 0)
-    {
-        save_state_register_field(state, "md_mapper_sram_size", &g_md_mapper.sram_size, sizeof(uint32_t));
-        save_state_register_field(state, "md_mapper_sram_data", g_md_mapper.sram_data, g_md_mapper.sram_size);
-    }
-
-    // Registrar dados de EEPROM se existirem
-    if (g_md_mapper.eeprom_data && g_md_mapper.eeprom_size > 0)
-    {
-        save_state_register_field(state, "md_mapper_eeprom_size", &g_md_mapper.eeprom_size, sizeof(uint32_t));
-        save_state_register_field(state, "md_mapper_eeprom_data", g_md_mapper.eeprom_data, g_md_mapper.eeprom_size);
-        save_state_register_field(state, "md_mapper_eeprom_state", &g_md_mapper.eeprom_state, sizeof(uint8_t));
-        save_state_register_field(state, "md_mapper_eeprom_address", &g_md_mapper.eeprom_address, sizeof(uint16_t));
-    }
-
-    LOG_INFO("Mapper registrado no sistema de save state");
-    return SAVE_STATE_ERROR_NONE;
+  return 0;
 }
 
 /**
  * @brief Restaura o estado do mapper a partir de um save state
  */
-int32_t md_mapper_restore_save_state(save_state_t *state)
-{
-    if (!state)
-    {
-        LOG_ERROR("Estado inválido para restauração de mapper");
-        return SAVE_STATE_ERROR_INVALID;
+int32_t md_mapper_restore_save_state(save_state_t *state) {
+  if (!state)
+    return -1;
+
+  // Restaurar campos comuns
+  SAVE_STATE_RESTORE_FIELD(state, "mapper_type", &mapper->type);
+  SAVE_STATE_RESTORE_FIELD(state, "num_banks", &mapper->num_banks);
+  SAVE_STATE_RESTORE_FIELD(state, "bank_size", &mapper->bank_size);
+  SAVE_STATE_RESTORE_FIELD(state, "current_banks", mapper->current_bank);
+  SAVE_STATE_RESTORE_FIELD(state, "sram_enabled", &mapper->sram_enabled);
+
+  // Restaurar SRAM se presente
+  if (mapper->sram_data && mapper->sram_size > 0) {
+    SAVE_STATE_RESTORE_FIELD(state, "sram_data", mapper->sram_data);
+  }
+
+  // Restaurar EEPROM se presente
+  if (mapper->eeprom_data && mapper->eeprom_size > 0) {
+    SAVE_STATE_RESTORE_FIELD(state, "eeprom_data", mapper->eeprom_data);
+  }
+
+  // Restaurar dados específicos do mapper
+  if (mapper->mapper_data) {
+    switch (mapper->type) {
+    case MD_MAPPER_SSF2:
+      SAVE_STATE_RESTORE_FIELD(state, "ssf2_data", mapper->mapper_data);
+      break;
+
+    case MD_MAPPER_SSRPG:
+      SAVE_STATE_RESTORE_FIELD(state, "ssrpg_data", mapper->mapper_data);
+      break;
+
+    case MD_MAPPER_EEPROM:
+      SAVE_STATE_RESTORE_FIELD(state, "eeprom_control", mapper->mapper_data);
+      break;
+
+    case MD_MAPPER_CODEMASTERS:
+      SAVE_STATE_RESTORE_FIELD(state, "codemasters_data", mapper->mapper_data);
+      break;
+
+    case MD_MAPPER_EA:
+      SAVE_STATE_RESTORE_FIELD(state, "ea_data", mapper->mapper_data);
+      break;
+
+    case MD_MAPPER_PIER_SOLAR:
+      SAVE_STATE_RESTORE_FIELD(state, "pier_solar_data", mapper->mapper_data);
+      break;
     }
+  }
 
-    // Obter o mapper global
-    extern md_mapper_t g_md_mapper;
-
-    // Restaurar campos básicos
-    md_mapper_type_t type;
-    if (save_state_read_field(state, "md_mapper_type", &type, sizeof(md_mapper_type_t)) != SAVE_STATE_ERROR_NONE)
-    {
-        LOG_ERROR("Falha ao ler tipo de mapper do save state");
-        return SAVE_STATE_ERROR_INVALID;
-    }
-
-    // Preservar ponteiros importantes
-    uint8_t *rom_data = g_md_mapper.rom_data;
-    uint32_t rom_size = g_md_mapper.rom_size;
-
-    // Se o tipo de mapper mudou, reinicializar
-    if (type != g_md_mapper.type)
-    {
-        LOG_INFO("Tipo de mapper alterado de %d para %d, reinicializando", g_md_mapper.type, type);
-        md_mapper_shutdown(&g_md_mapper);
-        if (!md_mapper_init(&g_md_mapper, type, rom_data, rom_size))
-        {
-            LOG_ERROR("Falha ao reinicializar mapper");
-            return SAVE_STATE_ERROR_INVALID;
-        }
-    }
-
-    // Restaurar campos
-    save_state_read_field(state, "md_mapper_num_banks", &g_md_mapper.num_banks, sizeof(uint32_t));
-    save_state_read_field(state, "md_mapper_bank_size", &g_md_mapper.bank_size, sizeof(uint32_t));
-    save_state_read_field(state, "md_mapper_current_banks", g_md_mapper.current_bank, sizeof(uint32_t) * 8);
-    save_state_read_field(state, "md_mapper_sram_enabled", &g_md_mapper.sram_enabled, sizeof(bool));
-    save_state_read_field(state, "md_mapper_sram_start", &g_md_mapper.sram_start, sizeof(uint32_t));
-    save_state_read_field(state, "md_mapper_sram_end", &g_md_mapper.sram_end, sizeof(uint32_t));
-
-    // Restaurar conteúdo da SRAM
-    uint32_t sram_size;
-    if (save_state_read_field(state, "md_mapper_sram_size", &sram_size, sizeof(uint32_t)) == SAVE_STATE_ERROR_NONE)
-    {
-        // Se o tamanho da SRAM mudou, realocar
-        if (sram_size != g_md_mapper.sram_size)
-        {
-            LOG_INFO("Tamanho da SRAM alterado de %u para %u bytes", g_md_mapper.sram_size, sram_size);
-
-            if (g_md_mapper.sram_data)
-            {
-                free(g_md_mapper.sram_data);
-            }
-
-            g_md_mapper.sram_data = (uint8_t *)malloc(sram_size);
-            if (!g_md_mapper.sram_data)
-            {
-                LOG_ERROR("Falha ao alocar memória para SRAM");
-                return SAVE_STATE_ERROR_MEMORY;
-            }
-
-            g_md_mapper.sram_size = sram_size;
-        }
-
-        // Restaurar dados da SRAM
-        if (g_md_mapper.sram_data && g_md_mapper.sram_size > 0)
-        {
-            save_state_read_field(state, "md_mapper_sram_data", g_md_mapper.sram_data, g_md_mapper.sram_size);
-        }
-    }
-
-    // Restaurar dados de EEPROM
-    uint32_t eeprom_size;
-    if (save_state_read_field(state, "md_mapper_eeprom_size", &eeprom_size, sizeof(uint32_t)) == SAVE_STATE_ERROR_NONE)
-    {
-        // Se o tamanho da EEPROM mudou, realocar
-        if (eeprom_size != g_md_mapper.eeprom_size)
-        {
-            LOG_INFO("Tamanho da EEPROM alterado de %u para %u bytes", g_md_mapper.eeprom_size, eeprom_size);
-
-            if (g_md_mapper.eeprom_data)
-            {
-                free(g_md_mapper.eeprom_data);
-            }
-
-            g_md_mapper.eeprom_data = (uint8_t *)malloc(eeprom_size);
-            if (!g_md_mapper.eeprom_data)
-            {
-                LOG_ERROR("Falha ao alocar memória para EEPROM");
-                return SAVE_STATE_ERROR_MEMORY;
-            }
-
-            g_md_mapper.eeprom_size = eeprom_size;
-        }
-
-        // Restaurar dados da EEPROM
-        if (g_md_mapper.eeprom_data && g_md_mapper.eeprom_size > 0)
-        {
-            save_state_read_field(state, "md_mapper_eeprom_data", g_md_mapper.eeprom_data, g_md_mapper.eeprom_size);
-            save_state_read_field(state, "md_mapper_eeprom_state", &g_md_mapper.eeprom_state, sizeof(uint8_t));
-            save_state_read_field(state, "md_mapper_eeprom_address", &g_md_mapper.eeprom_address, sizeof(uint16_t));
-        }
-    }
-
-    LOG_INFO("Estado do mapper restaurado com sucesso");
-    return SAVE_STATE_ERROR_NONE;
+  return 0;
 }

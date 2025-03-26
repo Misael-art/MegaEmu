@@ -1,74 +1,60 @@
 # EditorConfig is awesome: https://EditorConfig.org
 
-# top-most EditorConfig file
+# Configuração raiz
 root = true
 
-# Unix-style newlines with a newline ending every file
+# Configurações padrão para todos os arquivos
 [*]
+charset = utf-8
 end_of_line = lf
 insert_final_newline = true
-charset = utf-8
 trim_trailing_whitespace = true
-
-# C/C++ files
-[*.{c,h,cpp,hpp}]
 indent_style = space
 indent_size = 4
-max_line_length = 120
 
-# CMake files
-[{CMakeLists.txt,*.cmake}]
-indent_style = space
+# Arquivos C/C++
+[*.{c,h,cpp,hpp}]
+indent_size = 4
+max_line_length = 100
+
+# Arquivos CMake
+[CMakeLists.txt]
 indent_size = 2
 
-# PowerShell files
-[*.{ps1,psm1,psd1}]
-indent_style = space
-indent_size = 4
-max_line_length = 120
+[*.cmake]
+indent_size = 2
 
-# Markdown files
+# Arquivos de configuração
+[*.{json,yml,yaml}]
+indent_size = 2
+
+# Arquivos Markdown
 [*.md]
 trim_trailing_whitespace = false
 max_line_length = 80
 
-# YAML files
-[*.{yml,yaml}]
-indent_style = space
-indent_size = 2
-
-# JSON files
-[*.json]
-indent_style = space
-indent_size = 2
-
-# Python files
-[*.py]
-indent_style = space
-indent_size = 4
-max_line_length = 88
-
-# Shell scripts
+# Arquivos de shell script
 [*.sh]
-indent_style = space
-indent_size = 2
 end_of_line = lf
 
-# Windows batch files
+# Arquivos de Windows
 [*.{cmd,bat}]
 end_of_line = crlf
 
-# Documentation files
-[docs/**]
+# Arquivos de documentação
+[docs/**/*.md]
 max_line_length = 80
 
-# Test files
-[tests/**]
-indent_style = space
+# Arquivos de teste
+[tests/**/*]
 indent_size = 4
 
-# Third party files
-[third_party/**]
+# Arquivos de exemplo
+[examples/**/*]
+indent_size = 4
+
+# Ignorar arquivos gerados
+[{build,dist,node_modules}/**]
 charset = unset
 end_of_line = unset
 insert_final_newline = unset

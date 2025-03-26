@@ -1,1 +1,195 @@
-#include "frontend_config.h"#include "utils/log_utils.h"#include "utils/log_categories.h"#include "utils/enhanced_log.h"#include <stdio.h>#include <string.h>#include <ctype.h>// Configuração padrão do frontendconst frontend_config_t DEFAULT_FRONTEND_CONFIG = {    // Vídeo    .window_width = 800,    .window_height = 600,    .game_width = 256,    .game_height = 240,    .scale_factor = 2.0f,    .vsync_enabled = true,    .fullscreen = false,    .smooth_scaling = false,    .integer_scaling = true,    // Áudio    .audio_sample_rate = 44100,    .audio_buffer_size = 2048,    .audio_enabled = true,    // Entrada    .keyboard_enabled = true,    .gamepad_enabled = true,    // Interface    .show_fps = true,    .debug_overlay = false};void frontend_config_init(void){    EMU_LOG_INFO(EMU_LOG_CAT_FRONTEND, "Inicializando configuração do frontend");}int frontend_config_load(const char *filename){    if (!filename)    {        LOG_ERROR("Nome do arquivo de configuração inválido");        return FRONTEND_ERROR_INVALID_PARAM;    }    FILE *file = fopen(filename, "r");    if (!file)    {        LOG_ERROR("Falha ao abrir arquivo de configuração: %s", filename);        return FRONTEND_ERROR_FILE_NOT_FOUND;    }    char line[256];    char key[128];    char value[128];    while (fgets(line, sizeof(line), file))    {        // Ignorar comentários e linhas vazias        if (line[0] == '#' || line[0] == '\n')        {            continue;        }        // Extrair chave e valor        if (sscanf(line, "%127[^=]=%127s", key, value) == 2)        {            // Remover espaços em branco            char *k = key;            char *v = value;            while (*k && isspace(*k))                k++;            while (*v && isspace(*v))                v++;            char *end = k + strlen(k) - 1;            while (end > k && isspace(*end))                *end-- = '\0';            end = v + strlen(v) - 1;            while (end > v && isspace(*end))                *end-- = '\0';            // Processar configurações            if (strcmp(k, "window_width") == 0)            {                g_config.window_width = atoi(v);            }            else if (strcmp(k, "window_height") == 0)            {                g_config.window_height = atoi(v);            }            else if (strcmp(k, "fullscreen") == 0)            {                g_config.fullscreen = (strcmp(v, "true") == 0);            }            else if (strcmp(k, "vsync") == 0)            {                g_config.vsync_enabled = (strcmp(v, "true") == 0);            }            else if (strcmp(k, "scale_mode") == 0)            {                g_config.scale_factor = atof(v);            }            else if (strcmp(k, "audio_enabled") == 0)            {                g_config.audio_enabled = (strcmp(v, "true") == 0);            }            else if (strcmp(k, "audio_volume") == 0)            {                g_config.audio_volume = atoi(v);            }            else if (strcmp(k, "input_device") == 0)            {                strncpy(g_config.input_device, v, sizeof(g_config.input_device) - 1);            }            else            {                LOG_WARN("Configuração desconhecida: %s", k);            }        }    }    fclose(file);    return FRONTEND_ERROR_NONE;}int frontend_config_save(const char *filename){    if (!filename)    {        LOG_ERROR("Nome do arquivo de configuração inválido");        return FRONTEND_ERROR_INVALID_PARAM;    }    FILE *file = fopen(filename, "w");    if (!file)    {        LOG_ERROR("Falha ao criar arquivo de configuração: %s", filename);        return FRONTEND_ERROR_FILE_NOT_FOUND;    }    // Escrever cabeçalho    fprintf(file, "# Configuração do Frontend\n");    fprintf(file, "# Gerado automaticamente\n\n");    // Escrever configurações    fprintf(file, "window_width=%d\n", g_config.window_width);    fprintf(file, "window_height=%d\n", g_config.window_height);    fprintf(file, "fullscreen=%s\n", g_config.fullscreen ? "true" : "false");    fprintf(file, "vsync=%s\n", g_config.vsync_enabled ? "true" : "false");    fprintf(file, "scale_mode=%f\n", g_config.scale_factor);    fprintf(file, "audio_enabled=%s\n", g_config.audio_enabled ? "true" : "false");    fprintf(file, "audio_volume=%d\n", g_config.audio_volume);    fprintf(file, "input_device=%s\n", g_config.input_device);    fclose(file);    return FRONTEND_ERROR_NONE;}void frontend_config_set_defaults(frontend_config_t *config){    if (!config)        return;    memcpy(config, &DEFAULT_FRONTEND_CONFIG, sizeof(frontend_config_t));}
+/**
+ * @file frontend_config.c
+ * @brief Implementação específica para SDL das funções de configuração do
+ * frontend
+ *
+ * NOTA: Esta implementação estende a implementação genérica
+ * em src/frontend/common/frontend_config.c com funcionalidades
+ * específicas do SDL.
+ */
+
+#include "frontend_config.h"
+#include "../common/frontend_config.h"
+#include "utils/enhanced_log.h"
+#include "utils/log_categories.h"
+#include "utils/log_utils.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Estrutura para configurações específicas do SDL
+typedef struct {
+  // Adicionamos aqui configurações específicas do SDL
+  int sdl_render_driver;   // Identificador do driver de renderização (0 = auto)
+  bool sdl_hardware_accel; // Usar aceleração de hardware
+  int sdl_audio_device;    // Índice do dispositivo de áudio (-1 = padrão)
+  int sdl_joystick_index;  // Índice do joystick a usar (-1 = automatico)
+  char sdl_shader_path[256]; // Caminho para arquivo de shader personalizado
+} sdl_specific_config_t;
+
+// Configuração global específica do SDL
+static sdl_specific_config_t g_sdl_specific = {.sdl_render_driver = 0,
+                                               .sdl_hardware_accel = true,
+                                               .sdl_audio_device = -1,
+                                               .sdl_joystick_index = -1,
+                                               .sdl_shader_path = ""};
+
+/**
+ * @brief Inicializa as configurações específicas do SDL
+ */
+void sdl_frontend_config_init(void) {
+  EMU_LOG_INFO(EMU_LOG_CAT_FRONTEND,
+               "Inicializando configuração do frontend SDL");
+
+  // Inicializa a configuração comum
+  emu_frontend_config_init();
+
+  // Obtém a configuração global
+  emu_frontend_config_t *config = emu_frontend_config_get();
+
+  // Configura dados específicos do SDL
+  config->frontend_specific = &g_sdl_specific;
+
+  EMU_LOG_INFO(EMU_LOG_CAT_FRONTEND,
+               "Configuração do frontend SDL inicializada: width=%d, "
+               "height=%d, theme=%d",
+               config->window_width, config->window_height, config->theme_id);
+}
+
+/**
+ * @brief Obtém a configuração atual do SDL
+ *
+ * @return emu_frontend_config_t* Ponteiro para a configuração
+ */
+emu_frontend_config_t *sdl_frontend_get_config(void) {
+  return emu_frontend_config_get();
+}
+
+/**
+ * @brief Processa opções específicas do SDL durante o carregamento
+ */
+bool sdl_process_specific_option(const char *key, const char *value,
+                                 emu_frontend_config_t *config) {
+  // Primeiro verifica se temos um ponteiro válido para a configuração
+  // específica do SDL
+  sdl_specific_config_t *sdl_config =
+      (sdl_specific_config_t *)config->frontend_specific;
+  if (!sdl_config) {
+    return false;
+  }
+
+  // Processa opções específicas do SDL
+  if (strcmp(key, "sdl_render_driver") == 0) {
+    sdl_config->sdl_render_driver = atoi(value);
+    return true;
+  } else if (strcmp(key, "sdl_hardware_accel") == 0) {
+    sdl_config->sdl_hardware_accel = strcmp(value, "true") == 0;
+    return true;
+  } else if (strcmp(key, "sdl_audio_device") == 0) {
+    sdl_config->sdl_audio_device = atoi(value);
+    return true;
+  } else if (strcmp(key, "sdl_joystick_index") == 0) {
+    sdl_config->sdl_joystick_index = atoi(value);
+    return true;
+  } else if (strcmp(key, "sdl_shader_path") == 0) {
+    strncpy(sdl_config->sdl_shader_path, value,
+            sizeof(sdl_config->sdl_shader_path) - 1);
+    sdl_config->sdl_shader_path[sizeof(sdl_config->sdl_shader_path) - 1] = '\0';
+    return true;
+  }
+
+  // Opção não reconhecida
+  return false;
+}
+
+/**
+ * @brief Escreve opções específicas do SDL ao salvar a configuração
+ */
+bool sdl_write_specific_options(FILE *file,
+                                const emu_frontend_config_t *config) {
+  // Primeiro verifica se temos um ponteiro válido para a configuração
+  // específica do SDL
+  const sdl_specific_config_t *sdl_config =
+      (const sdl_specific_config_t *)config->frontend_specific;
+  if (!sdl_config || !file) {
+    return false;
+  }
+
+  // Escreve configurações específicas do SDL
+  fprintf(file, "# Configurações específicas do SDL\n");
+  fprintf(file, "sdl_render_driver=%d\n", sdl_config->sdl_render_driver);
+  fprintf(file, "sdl_hardware_accel=%s\n",
+          sdl_config->sdl_hardware_accel ? "true" : "false");
+  fprintf(file, "sdl_audio_device=%d\n", sdl_config->sdl_audio_device);
+  fprintf(file, "sdl_joystick_index=%d\n", sdl_config->sdl_joystick_index);
+
+  if (strlen(sdl_config->sdl_shader_path) > 0) {
+    fprintf(file, "sdl_shader_path=%s\n", sdl_config->sdl_shader_path);
+  }
+
+  return true;
+}
+
+/**
+ * @brief Sobrescreve as funções de processamento de opções específicas
+ */
+bool emu_frontend_config_process_option(const char *key, const char *value,
+                                        emu_frontend_config_t *config) {
+  return sdl_process_specific_option(key, value, config);
+}
+
+/**
+ * @brief Sobrescreve as funções de escrita de opções específicas
+ */
+bool emu_frontend_config_write_specific_options(
+    FILE *file, const emu_frontend_config_t *config) {
+  return sdl_write_specific_options(file, config);
+}
+
+/**
+ * @brief Salva a configuração específica do SDL
+ *
+ * @return bool true se a configuração foi salva com sucesso, false caso
+ * contrário
+ */
+bool sdl_frontend_save_config(void) {
+  EMU_LOG_INFO(EMU_LOG_CAT_FRONTEND, "Salvando configuração específica do SDL");
+
+  // Usa a função comum para salvar a configuração
+  return emu_frontend_config_save("./config/sdl_config.ini",
+                                  emu_frontend_get_config());
+}
+
+/**
+ * @brief Carrega a configuração específica do SDL
+ *
+ * @return bool true se a configuração foi carregada com sucesso, false caso
+ * contrário
+ */
+bool sdl_frontend_load_config(void) {
+  EMU_LOG_INFO(EMU_LOG_CAT_FRONTEND,
+               "Carregando configuração específica do SDL");
+
+  // Garante que temos as configurações específicas do SDL inicializadas
+  emu_frontend_config_t *config = emu_frontend_get_config();
+  if (!config->frontend_specific) {
+    config->frontend_specific = &g_sdl_specific;
+  }
+
+  // Usa a função comum para carregar a configuração
+  bool success = emu_frontend_config_load("./config/sdl_config.ini", config);
+
+  if (success) {
+    EMU_LOG_INFO(EMU_LOG_CAT_FRONTEND,
+                 "Configuração do SDL carregada: width=%d, height=%d, theme=%d",
+                 config->window_width, config->window_height, config->theme_id);
+  } else {
+    EMU_LOG_WARN(EMU_LOG_CAT_FRONTEND,
+                 "Falha ao carregar configuração. Usando valores padrão.");
+  }
+
+  return success;
+}
+
+// Funções específicas do SDL para configuração
+// ... Adicionar conforme necessário

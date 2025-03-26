@@ -1,225 +1,312 @@
 /**
  * @file m68k_adapter.c
- * @brief Adaptador do processador Motorola 68000 (M68K) para o Mega Drive
+ * @brief Implementação do adaptador para o processador Motorola 68000 do Mega
+ * Drive
+ * @version 1.0
+ * @date 2024-03-21
  */
 
+#include "m68k_adapter.h"
 #include <stdlib.h>
 #include <string.h>
-#include "m68k_adapter.h"
-#include "../memory/md_memory.h"
 
-/**
- * @brief Estrutura do adaptador M68K para Mega Drive
- */
-struct md_m68k_s
-{
-    m68k_t *cpu;           /* Instância do M68K */
-    md_context_t *context; /* Contexto do Mega Drive */
-};
+// Constantes do M68000
+#define SR_TRACE 0x8000      // Modo trace
+#define SR_SUPERVISOR 0x2000 // Modo supervisor
+#define SR_INT_MASK 0x0700   // Máscara de interrupção
+#define SR_EXTEND 0x0010     // Flag extend
+#define SR_NEGATIVE 0x0008   // Flag negative
+#define SR_ZERO 0x0004       // Flag zero
+#define SR_OVERFLOW 0x0002   // Flag overflow
+#define SR_CARRY 0x0001      // Flag carry
 
-/**
- * @brief Callback de leitura de byte
- * @param context Contexto do Mega Drive
- * @param address Endereço de memória
- * @return Valor lido
- */
-static uint8_t md_m68k_read_byte(void *context, uint32_t address)
-{
-    md_context_t *md = (md_context_t *)context;
-    return md_memory_read_byte(md, address);
+// Registradores
+#define REG_D0 0 // Data registers
+#define REG_D1 1
+#define REG_D2 2
+#define REG_D3 3
+#define REG_D4 4
+#define REG_D5 5
+#define REG_D6 6
+#define REG_D7 7
+#define REG_A0 8 // Address registers
+#define REG_A1 9
+#define REG_A2 10
+#define REG_A3 11
+#define REG_A4 12
+#define REG_A5 13
+#define REG_A6 14
+#define REG_A7 15 // Stack pointer
+
+// Declaração da função de execução definida em m68k_execute.c
+extern int m68k_execute_cycles(megadrive_m68k_context_t *ctx,
+                               int target_cycles);
+
+// Funções estáticas do adaptador
+static int adapter_init(void *ctx, const emu_cpu_config_t *config) {
+  megadrive_m68k_context_t *context = (megadrive_m68k_context_t *)ctx;
+  if (!context || !config)
+    return -1;
+
+  // Limpa todo o contexto
+  memset(context, 0, sizeof(*context));
+
+  // Aloca memória RAM
+  context->ram = calloc(1, MD_M68K_RAM_SIZE);
+  if (!context->ram)
+    return -1;
+
+  // Configura estado inicial
+  context->pc = 0;
+  context->sr = SR_SUPERVISOR; // Inicia em modo supervisor
+  context->stopped = false;
+  context->interrupt_level = 0;
+  context->interrupt_pending = false;
+  context->cycles = 0;
+  context->target_cycles = 0;
+
+  return 0;
 }
 
-/**
- * @brief Callback de leitura de palavra
- * @param context Contexto do Mega Drive
- * @param address Endereço de memória
- * @return Valor lido
- */
-static uint16_t md_m68k_read_word(void *context, uint32_t address)
-{
-    md_context_t *md = (md_context_t *)context;
-    return md_memory_read_word(md, address);
+static void adapter_reset(void *ctx) {
+  megadrive_m68k_context_t *context = (megadrive_m68k_context_t *)ctx;
+  if (!context)
+    return;
+
+  // Lê vetor de reset da ROM
+  if (context->rom) {
+    context->pc = (context->rom[4] << 24) | (context->rom[5] << 16) |
+                  (context->rom[6] << 8) | context->rom[7];
+  } else {
+    context->pc = 0;
+  }
+
+  // Reseta estado
+  context->sr = SR_SUPERVISOR;
+  context->stopped = false;
+  context->interrupt_level = 0;
+  context->interrupt_pending = false;
+  context->cycles = 0;
+  context->target_cycles = 0;
+
+  // Limpa registradores
+  memset(context->registers, 0, sizeof(context->registers));
+
+  // Configura stack pointer inicial
+  if (context->rom) {
+    context->registers[REG_A7] = (context->rom[0] << 24) |
+                                 (context->rom[1] << 16) |
+                                 (context->rom[2] << 8) | context->rom[3];
+  } else {
+    context->registers[REG_A7] = 0;
+  }
 }
 
-/**
- * @brief Callback de leitura de palavra longa
- * @param context Contexto do Mega Drive
- * @param address Endereço de memória
- * @return Valor lido
- */
-static uint32_t md_m68k_read_long(void *context, uint32_t address)
-{
-    md_context_t *md = (md_context_t *)context;
-    return md_memory_read_long(md, address);
+static void adapter_shutdown(void *ctx) {
+  megadrive_m68k_context_t *context = (megadrive_m68k_context_t *)ctx;
+  if (!context)
+    return;
+
+  // Libera memória RAM
+  free(context->ram);
+  context->ram = NULL;
+
+  // Limpa todo o contexto
+  memset(context, 0, sizeof(*context));
 }
 
-/**
- * @brief Callback de escrita de byte
- * @param context Contexto do Mega Drive
- * @param address Endereço de memória
- * @param value Valor a escrever
- */
-static void md_m68k_write_byte(void *context, uint32_t address, uint8_t value)
-{
-    md_context_t *md = (md_context_t *)context;
-    md_memory_write_byte(md, address, value);
+static int adapter_execute(void *ctx, int cycles) {
+  megadrive_m68k_context_t *context = (megadrive_m68k_context_t *)ctx;
+  if (!context || cycles <= 0)
+    return 0;
+
+  // Usa a nova função de execução
+  return m68k_execute_cycles(context, cycles);
 }
 
-/**
- * @brief Callback de escrita de palavra
- * @param context Contexto do Mega Drive
- * @param address Endereço de memória
- * @param value Valor a escrever
- */
-static void md_m68k_write_word(void *context, uint32_t address, uint16_t value)
-{
-    md_context_t *md = (md_context_t *)context;
-    md_memory_write_word(md, address, value);
+static uint8_t adapter_read_memory(void *ctx, uint32_t address) {
+  megadrive_m68k_context_t *context = (megadrive_m68k_context_t *)ctx;
+  if (!context)
+    return 0xFF;
+
+  // Mapeia endereço para região de memória
+  if (address < MD_M68K_RAM_SIZE) {
+    // RAM
+    return context->ram[address];
+  } else if (context->rom && address < context->rom_size) {
+    // ROM
+    return context->rom[address];
+  } else if (context->read_callback) {
+    // Callback de leitura para outros dispositivos
+    return context->read_callback(address, context->callback_data) & 0xFF;
+  }
+
+  return 0xFF;
 }
 
-/**
- * @brief Callback de escrita de palavra longa
- * @param context Contexto do Mega Drive
- * @param address Endereço de memória
- * @param value Valor a escrever
- */
-static void md_m68k_write_long(void *context, uint32_t address, uint32_t value)
-{
-    md_context_t *md = (md_context_t *)context;
-    md_memory_write_long(md, address, value);
+static void adapter_write_memory(void *ctx, uint32_t address, uint8_t value) {
+  megadrive_m68k_context_t *context = (megadrive_m68k_context_t *)ctx;
+  if (!context)
+    return;
+
+  // Mapeia endereço para região de memória
+  if (address < MD_M68K_RAM_SIZE) {
+    // RAM
+    context->ram[address] = value;
+  } else if (context->write_callback) {
+    // Callback de escrita para outros dispositivos
+    context->write_callback(address, value, context->callback_data);
+  }
 }
 
-/**
- * @brief Cria uma nova instância do adaptador M68K para Mega Drive
- * @return Ponteiro para a instância do adaptador ou NULL em caso de erro
- */
-md_m68k_t *md_m68k_create(void)
-{
-    md_m68k_t *adapter = (md_m68k_t *)malloc(sizeof(md_m68k_t));
-    if (adapter)
-    {
-        memset(adapter, 0, sizeof(md_m68k_t));
-        adapter->cpu = m68k_create();
-        if (!adapter->cpu)
-        {
-            free(adapter);
+static void adapter_get_state(void *ctx, emu_cpu_state_t *state) {
+  megadrive_m68k_context_t *context = (megadrive_m68k_context_t *)ctx;
+  if (!context || !state)
+    return;
+
+  state->pc = context->pc;
+  state->cycles = context->cycles;
+  state->flags = context->sr;
+  state->context = context;
+}
+
+static void adapter_set_state(void *ctx, const emu_cpu_state_t *state) {
+  megadrive_m68k_context_t *context = (megadrive_m68k_context_t *)ctx;
+  if (!context || !state)
+    return;
+
+  context->pc = state->pc;
+  context->cycles = state->cycles;
+  context->sr = state->flags;
+}
+
+// Funções públicas
+emu_cpu_interface_t *megadrive_m68k_adapter_create(void) {
+  emu_cpu_interface_t *interface = calloc(1, sizeof(emu_cpu_interface_t));
+  megadrive_m68k_context_t *context =
+      calloc(1, sizeof(megadrive_m68k_context_t));
+
+  if (!interface || !context) {
+    free(interface);
+    free(context);
             return NULL;
         }
-    }
-    return adapter;
+
+  // Configura a interface
+  interface->context = context;
+  interface->init = adapter_init;
+  interface->reset = adapter_reset;
+  interface->shutdown = adapter_shutdown;
+  interface->execute = adapter_execute;
+  interface->read_memory = adapter_read_memory;
+  interface->write_memory = adapter_write_memory;
+  interface->get_state = adapter_get_state;
+  interface->set_state = adapter_set_state;
+
+  return interface;
 }
 
-/**
- * @brief Destrói uma instância do adaptador M68K para Mega Drive
- * @param adapter Ponteiro para a instância do adaptador
- */
-void md_m68k_destroy(md_m68k_t *adapter)
-{
-    if (adapter)
-    {
-        if (adapter->cpu)
-        {
-            m68k_destroy(adapter->cpu);
-        }
-        free(adapter);
-    }
+void megadrive_m68k_adapter_destroy(emu_cpu_interface_t *cpu) {
+  if (!cpu)
+    return;
+
+  if (cpu->context) {
+    adapter_shutdown(cpu->context);
+    free(cpu->context);
+  }
+
+  free(cpu);
 }
 
-/**
- * @brief Inicializa o adaptador M68K para Mega Drive
- * @param adapter Ponteiro para a instância do adaptador
- * @param context Contexto do Mega Drive
- * @return 0 em caso de sucesso, -1 em caso de erro
- */
-int md_m68k_init(md_m68k_t *adapter, md_context_t *context)
-{
-    if (!adapter || !context)
-    {
-        return -1;
-    }
-
-    adapter->context = context;
-
-    /* Configurar callbacks de acesso à memória */
-    adapter->cpu->read_byte = md_m68k_read_byte;
-    adapter->cpu->read_word = md_m68k_read_word;
-    adapter->cpu->read_long = md_m68k_read_long;
-    adapter->cpu->write_byte = md_m68k_write_byte;
-    adapter->cpu->write_word = md_m68k_write_word;
-    adapter->cpu->write_long = md_m68k_write_long;
-    adapter->cpu->context = context;
-
-    /* Inicializar CPU */
-    m68k_init(adapter->cpu);
-
-    return 0;
+megadrive_m68k_context_t *megadrive_m68k_get_context(emu_cpu_interface_t *cpu) {
+  if (!cpu || !cpu->context)
+    return NULL;
+  return (megadrive_m68k_context_t *)cpu->context;
 }
 
-/**
- * @brief Reseta o adaptador M68K para Mega Drive
- * @param adapter Ponteiro para a instância do adaptador
- */
-void md_m68k_reset(md_m68k_t *adapter)
-{
-    if (adapter && adapter->cpu)
-    {
-        m68k_reset(adapter->cpu);
-    }
+void megadrive_m68k_set_context(emu_cpu_interface_t *cpu,
+                                megadrive_m68k_context_t *context) {
+  if (!cpu || !cpu->context || !context)
+    return;
+  memcpy(cpu->context, context, sizeof(megadrive_m68k_context_t));
 }
 
-/**
- * @brief Executa um número específico de ciclos no adaptador M68K para Mega Drive
- * @param adapter Ponteiro para a instância do adaptador
- * @param cycles Número de ciclos a executar
- * @return Número de ciclos executados
- */
-int md_m68k_execute_cycles(md_m68k_t *adapter, int cycles)
-{
-    if (!adapter || !adapter->cpu)
-    {
+void m68k_set_memory_callbacks(megadrive_m68k_context_t *ctx,
+                               md_m68k_read_callback_t read_cb,
+                               md_m68k_write_callback_t write_cb,
+                               void *user_data) {
+  if (!ctx)
+    return;
+  ctx->read_callback = read_cb;
+  ctx->write_callback = write_cb;
+  ctx->callback_data = user_data;
+}
+
+void m68k_load_rom(megadrive_m68k_context_t *ctx, const uint8_t *data,
+                   uint32_t size) {
+  if (!ctx || !data || size == 0)
+    return;
+
+  // Verifica tamanho máximo
+  if (size > MD_M68K_ROM_BANK_SIZE * MD_M68K_MAX_ROM_BANKS) {
+    size = MD_M68K_ROM_BANK_SIZE * MD_M68K_MAX_ROM_BANKS;
+  }
+
+  // Copia ROM para os bancos
+  uint32_t banks = (size + MD_M68K_ROM_BANK_SIZE - 1) / MD_M68K_ROM_BANK_SIZE;
+  for (uint32_t i = 0; i < banks; i++) {
+    uint32_t offset = i * MD_M68K_ROM_BANK_SIZE;
+    uint32_t remaining = size - offset;
+    uint32_t copy_size =
+        remaining < MD_M68K_ROM_BANK_SIZE ? remaining : MD_M68K_ROM_BANK_SIZE;
+    memcpy(ctx->rom_banks[i], data + offset, copy_size);
+  }
+
+  // Configura banco inicial
+  ctx->rom = ctx->rom_banks[0];
+  ctx->rom_size = size;
+  ctx->current_bank = 0;
+}
+
+void m68k_set_rom_bank(megadrive_m68k_context_t *ctx, uint8_t bank) {
+  if (!ctx || bank >= MD_M68K_MAX_ROM_BANKS)
+    return;
+  ctx->current_bank = bank;
+  ctx->rom = ctx->rom_banks[bank];
+}
+
+void m68k_trigger_interrupt(megadrive_m68k_context_t *ctx,
+                            md_m68k_interrupt_t level) {
+  if (!ctx)
+    return;
+  ctx->interrupt_level = level;
+  ctx->interrupt_pending = true;
+}
+
+void m68k_clear_interrupt(megadrive_m68k_context_t *ctx,
+                          md_m68k_interrupt_t level) {
+  if (!ctx)
+    return;
+  if (ctx->interrupt_level == level) {
+    ctx->interrupt_level = 0;
+    ctx->interrupt_pending = false;
+  }
+}
+
+uint32_t m68k_get_pc(const megadrive_m68k_context_t *ctx) {
+  return ctx ? ctx->pc : 0;
+}
+
+uint32_t m68k_get_register(const megadrive_m68k_context_t *ctx, uint8_t reg) {
+  if (!ctx || reg >= 16)
         return 0;
-    }
-    return m68k_execute_cycles(adapter->cpu, cycles);
+  return ctx->registers[reg];
 }
 
-/**
- * @brief Define o nível de interrupção no adaptador M68K para Mega Drive
- * @param adapter Ponteiro para a instância do adaptador
- * @param level Nível de interrupção (0-7)
- */
-void md_m68k_set_irq(md_m68k_t *adapter, int level)
-{
-    if (adapter && adapter->cpu)
-    {
-        m68k_set_irq(adapter->cpu, level);
-    }
+uint16_t m68k_get_sr(const megadrive_m68k_context_t *ctx) {
+  return ctx ? ctx->sr : 0;
 }
 
-/**
- * @brief Obtém o valor de um registrador do adaptador M68K para Mega Drive
- * @param adapter Ponteiro para a instância do adaptador
- * @param reg Índice do registrador
- * @return Valor do registrador
- */
-uint32_t md_m68k_get_register(md_m68k_t *adapter, int reg)
-{
-    if (!adapter || !adapter->cpu)
-    {
-        return 0;
-    }
-    return m68k_get_register(adapter->cpu, reg);
-}
-
-/**
- * @brief Define o valor de um registrador do adaptador M68K para Mega Drive
- * @param adapter Ponteiro para a instância do adaptador
- * @param reg Índice do registrador
- * @param value Valor a definir
- */
-void md_m68k_set_register(md_m68k_t *adapter, int reg, uint32_t value)
-{
-    if (adapter && adapter->cpu)
-    {
-        m68k_set_register(adapter->cpu, reg, value);
-    }
+bool m68k_is_stopped(const megadrive_m68k_context_t *ctx) {
+  return ctx ? ctx->stopped : false;
 }

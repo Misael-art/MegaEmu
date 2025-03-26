@@ -1,28 +1,33 @@
+/**
+ * @file enhanced_log.h
+ * @brief Sistema de log aprimorado com suporte a categorias e níveis
+ */
+
 #ifndef EMU_ENHANCED_LOG_H
 #define EMU_ENHANCED_LOG_H
 
+#include "common_types.h"
+#include "log_categories.h"
+#include "log_modules.h"
 #include <stdarg.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdint.h>
-#include "common_types.h"
-#include "log_modules.h"
-#include "log_categories.h"
+#include <stdio.h>
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
-/* Níveis de log */
-#define EMU_LOG_LEVEL_ERROR 0
-#define EMU_LOG_LEVEL_WARNING 1
-#define EMU_LOG_LEVEL_INFO 2
-#define EMU_LOG_LEVEL_DEBUG 3
-#define EMU_LOG_LEVEL_TRACE 4
-#define EMU_LOG_LEVEL_MAX 5
-
-    typedef int emu_log_level_t;
+/**
+ * @brief Níveis de log disponíveis
+ */
+typedef enum {
+  EMU_LOG_LEVEL_ERROR = 0, // Erros críticos que impedem a execução
+  EMU_LOG_LEVEL_WARN,      // Avisos importantes mas não críticos
+  EMU_LOG_LEVEL_INFO,      // Informações gerais sobre o estado do sistema
+  EMU_LOG_LEVEL_DEBUG,     // Informações detalhadas para debug
+  EMU_LOG_LEVEL_TRACE      // Informações muito detalhadas para trace
+} emu_log_level_t;
 
 /* Flags de configuração do log */
 #define EMU_LOG_FLAG_NONE 0
@@ -32,56 +37,99 @@ extern "C"
 #define EMU_LOG_FLAG_USE_FILE_LINE (1 << 3)
 #define EMU_LOG_FLAG_USE_COLOR (1 << 4)
 
-    typedef int emu_log_flags_t;
+typedef int emu_log_flags_t;
 
-    /* Estrutura de configuração do log */
-    struct emu_log_config
-    {
-        emu_log_level_t level;
-        FILE *output;
-        emu_log_flags_t flags;
-        /* Campos adicionais para compatibilidade com testes */
-        const char *output_file; /* Nome do arquivo de saída, se usado */
-        bool use_timestamp;      /* Flag para uso de timestamp */
-        bool use_level;          /* Flag para mostrar o nível de log */
-        bool use_category;       /* Flag para mostrar a categoria */
-    };
+/* Estrutura de configuração do log */
+struct emu_log_config {
+  emu_log_level_t level;
+  FILE *output;
+  emu_log_flags_t flags;
+  /* Campos adicionais para compatibilidade com testes */
+  const char *output_file; /* Nome do arquivo de saída, se usado */
+  bool use_timestamp;      /* Flag para uso de timestamp */
+  bool use_level;          /* Flag para mostrar o nível de log */
+  bool use_category;       /* Flag para mostrar a categoria */
+};
 
-    typedef struct emu_log_config emu_log_config_t;
+typedef struct emu_log_config emu_log_config_t;
 
-    /* Funções de interface */
-    bool emu_log_init(const emu_log_config_t *config);
-    void emu_log_shutdown(void);
-    void emu_log_set_level(emu_log_level_t level);
-    void emu_log_set_module_level(emu_log_module_t module, emu_log_level_t level);
-    void emu_log_set_category_level(emu_log_category_t category, emu_log_level_t level);
-    void emu_log_set_file(const char *filename);
-    void emu_log_message(emu_log_level_t level, emu_log_category_t category, const char *file, int32_t line, const char *fmt, ...);
-    bool emu_enhanced_log_is_enabled(emu_log_level_t level);
+/**
+ * @brief Inicializa o sistema de log
+ * @param log_file Caminho do arquivo de log ou NULL para log no console
+ * @return true se sucesso, false caso contrário
+ */
+bool emu_log_init(const char *log_file);
 
-/* Macros de log por categoria */
-#define EMU_LOG_ERROR(category, ...) \
-    emu_log_message(EMU_LOG_LEVEL_ERROR, category, __FILE__, __LINE__, __VA_ARGS__)
+/**
+ * @brief Finaliza o sistema de log
+ */
+void emu_log_shutdown(void);
 
-#define EMU_LOG_WARN(category, ...) \
-    emu_log_message(EMU_LOG_LEVEL_WARNING, category, __FILE__, __LINE__, __VA_ARGS__)
+/**
+ * @brief Define o nível mínimo de log
+ * @param level Nível mínimo de log
+ */
+void emu_log_set_level(emu_log_level_t level);
 
-#define EMU_LOG_WARNING(category, ...) \
-    emu_log_message(EMU_LOG_LEVEL_WARNING, category, __FILE__, __LINE__, __VA_ARGS__)
+/**
+ * @brief Habilita ou desabilita uma categoria de log
+ * @param category Categoria de log
+ * @param enabled true para habilitar, false para desabilitar
+ */
+void emu_log_set_category_enabled(int category, bool enabled);
 
-#define EMU_LOG_INFO(category, ...) \
-    emu_log_message(EMU_LOG_LEVEL_INFO, category, __FILE__, __LINE__, __VA_ARGS__)
+/**
+ * @brief Registra uma mensagem de log
+ * @param level Nível da mensagem
+ * @param category Categoria da mensagem
+ * @param file Arquivo fonte
+ * @param line Linha no arquivo
+ * @param func Função
+ * @param fmt Formato da mensagem
+ * @param ... Argumentos do formato
+ */
+void emu_log_message(emu_log_level_t level, int category, const char *file,
+                     int line, const char *func, const char *fmt, ...);
 
-#define EMU_LOG_DEBUG(category, ...) \
-    emu_log_message(EMU_LOG_LEVEL_DEBUG, category, __FILE__, __LINE__, __VA_ARGS__)
+/**
+ * @brief Registra uma mensagem de log com argumentos variáveis
+ * @param level Nível da mensagem
+ * @param category Categoria da mensagem
+ * @param file Arquivo fonte
+ * @param line Linha no arquivo
+ * @param func Função
+ * @param fmt Formato da mensagem
+ * @param args Lista de argumentos
+ */
+void emu_log_message_v(emu_log_level_t level, int category, const char *file,
+                       int line, const char *func, const char *fmt,
+                       va_list args);
 
-#define EMU_LOG_TRACE(category, ...) \
-    emu_log_message(EMU_LOG_LEVEL_TRACE, category, __FILE__, __LINE__, __VA_ARGS__)
+// Macros para facilitar o uso do log
+#define EMU_LOG_ERROR(cat, ...)                                                \
+  emu_log_message(EMU_LOG_LEVEL_ERROR, cat, __FILE__, __LINE__, __func__,      \
+                  __VA_ARGS__)
+
+#define EMU_LOG_WARN(cat, ...)                                                 \
+  emu_log_message(EMU_LOG_LEVEL_WARN, cat, __FILE__, __LINE__, __func__,       \
+                  __VA_ARGS__)
+
+#define EMU_LOG_INFO(cat, ...)                                                 \
+  emu_log_message(EMU_LOG_LEVEL_INFO, cat, __FILE__, __LINE__, __func__,       \
+                  __VA_ARGS__)
+
+#define EMU_LOG_DEBUG(cat, ...)                                                \
+  emu_log_message(EMU_LOG_LEVEL_DEBUG, cat, __FILE__, __LINE__, __func__,      \
+                  __VA_ARGS__)
+
+#define EMU_LOG_TRACE(cat, ...)                                                \
+  emu_log_message(EMU_LOG_LEVEL_TRACE, cat, __FILE__, __LINE__, __func__,      \
+                  __VA_ARGS__)
 
 /* Macros de log simples */
 #define LOG_ERROR(...) EMU_LOG_ERROR(EMU_LOG_CAT_CORE, __VA_ARGS__)
 #define LOG_WARN(...) EMU_LOG_WARN(EMU_LOG_CAT_CORE, __VA_ARGS__)
-#define LOG_WARNING(...) EMU_LOG_WARNING(EMU_LOG_CAT_CORE, __VA_ARGS__)
+#define LOG_WARNING(...) EMU_LOG_WARN(EMU_LOG_CAT_CORE, __VA_ARGS__)
 #define LOG_INFO(...) EMU_LOG_INFO(EMU_LOG_CAT_CORE, __VA_ARGS__)
 #define LOG_DEBUG(...) EMU_LOG_DEBUG(EMU_LOG_CAT_CORE, __VA_ARGS__)
 #define LOG_TRACE(...) EMU_LOG_TRACE(EMU_LOG_CAT_CORE, __VA_ARGS__)

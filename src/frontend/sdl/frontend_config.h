@@ -1,1 +1,21 @@
-/** * @file frontend_config.h * @brief Configuração do frontend SDL */#ifndef FRONTEND_CONFIG_H#define FRONTEND_CONFIG_H#include <stdbool.h>#include <stdint.h>// Configuração do frontendtypedef struct frontend_config_t{    // Vídeo    int32_t window_width;    int32_t window_height;    int32_t game_width;    int32_t game_height;    float scale_factor;    bool vsync_enabled;    bool fullscreen;    bool smooth_scaling;    bool integer_scaling;    // Áudio    int32_t audio_sample_rate;    int32_t audio_buffer_size;    bool audio_enabled;    // Entrada    bool keyboard_enabled;    bool gamepad_enabled;    // Interface    bool show_fps;    bool debug_overlay;} frontend_config_t;// Configuração padrãoextern const frontend_config_t DEFAULT_FRONTEND_CONFIG;// Funções de configuraçãovoid frontend_config_init(void);void frontend_config_load(const char *config_file);void frontend_config_save(const char *config_file);void frontend_config_set_defaults(frontend_config_t *config);#endif // FRONTEND_CONFIG_H
+/**
+ * @file frontend_config.h
+ * @brief Configuração específica para o frontend SDL
+ */
+#ifndef SDL_FRONTEND_CONFIG_H
+#define SDL_FRONTEND_CONFIG_H
+
+#include "frontend/common/frontend_config.h"
+#include <stdbool.h>
+#include <stdint.h>
+
+// Configuração padrão específica do SDL
+extern const emu_frontend_config_t SDL_DEFAULT_FRONTEND_CONFIG;
+
+// Funções de configuração específicas do SDL
+void sdl_frontend_config_init(void);
+emu_frontend_config_t *sdl_frontend_get_config(void);
+bool sdl_frontend_save_config(void);
+bool sdl_frontend_load_config(void);
+
+#endif // SDL_FRONTEND_CONFIG_H

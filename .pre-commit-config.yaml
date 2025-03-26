@@ -1,0 +1,85 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  - repo: https://github.com/pocc/pre-commit-hooks
+    rev: v1.3.5
+    hooks:
+      - id: clang-format
+        args: [--style=file]
+      - id: clang-tidy
+        args: [--config-file=.clang-tidy]
+      - id: cppcheck
+        args: [--enable=all, --std=c++17]
+
+  - repo: https://github.com/cheshirekow/cmake-format-precommit
+    rev: v0.6.13
+    hooks:
+      - id: cmake-format
+      - id: cmake-lint
+
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.4
+    hooks:
+      - id: remove-crlf
+      - id: forbid-tabs
+      - id: remove-tabs
+        args: [--whitespaces-count, '4']
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        types_or: [json, yaml, markdown]
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+
+  - repo: local
+    hooks:
+      - id: check-commit-message
+        name: Check commit message
+        entry: python scripts/check_commit_message.py
+        language: python
+        stages: [commit-msg]
+
+      - id: run-tests
+        name: Run unit tests
+        entry: python scripts/run_tests.py
+        language: python
+        pass_filenames: false
+        stages: [push]
+
+      - id: check-code-style
+        name: Check code style
+        entry: python scripts/check_code_style.py
+        language: python
+        types: [c++]
+        stages: [commit]
+
+      - id: update-version
+        name: Update version
+        entry: python scripts/update_version.py
+        language: python
+        pass_filenames: false
+        stages: [push]
+
+      - id: generate-docs
+        name: Generate documentation
+        entry: python scripts/generate_docs.py
+        language: python
+        pass_filenames: false
+        stages: [push]
